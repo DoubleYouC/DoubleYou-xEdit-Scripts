@@ -19,8 +19,8 @@ end;
 // called for every record selected in xEdit
 function Process(e: IInterface): integer;
 var
-  previousOverride, base, basecopy: IInterface;
-  layer, lod: String;
+  previousOverride, base, basecopy, newbase: IInterface;
+  layer, lod, editorid: String;
 begin
   Result := 0;
 
@@ -31,17 +31,17 @@ begin
 
   if Signature(e) <> 'REFR' then Exit;
 
-  // if GetIsDeleted(e) then begin
-  //   AddMessage('Record ' + Name(e) + ' is deleted, removing.');
-  //   Remove(e);
-  //   Exit;
-  // end;
+  if GetIsDeleted(e) then begin
+    AddMessage('Record ' + Name(e) + ' is deleted, removing.');
+    Remove(e);
+    Exit;
+  end;
 
-  // if GetIsCleanDeleted(e) then begin
-  //   AddMessage('Record ' + Name(e) + ' is clean deleted, removing.');
-  //   Remove(e);
-  //   Exit;
-  // end;
+  if GetIsCleanDeleted(e) then begin
+    AddMessage('Record ' + Name(e) + ' is clean deleted, removing.');
+    Remove(e);
+    Exit;
+  end;
 
   base := WinningOverride(LinksTo(ElementBySignature(e, 'NAME')));
   if not Assigned(base) then begin
@@ -50,31 +50,47 @@ begin
     Exit;
   end;
 
-  if Pos(Signature(base), signatures) = 0 then begin
-    AddMessage('Base record ' + Name(base) + ' is not a valid type: ' + Signature(base));
-    Remove(e);
-    Exit;
+  editorid := GetElementEditValues(base, 'EDID');
+  if ContainsText(editorid, 'nolod') then begin
+
+    editorid := StringReplace(editorid, '_NOLOD', '', [rfReplaceAll, rfIgnoreCase]);
+    editorid := StringReplace(editorid, 'NOLOD', '', [rfReplaceAll, rfIgnoreCase]);
+    newbase := MainRecordByEditorID(GroupBySignature(FileByIndex(0), 'STAT'), editorid);
+    if not Assigned(newbase) then begin
+      AddMessage('No base record found for ' + editorid);
+      Remove(e);
+      Exit;
+    end;
+    SetElementEditValues(e, 'NAME', IntToHex(GetLoadOrderFormID(newbase), 8));
   end;
 
-  if not StrToBool(GetElementEditValues(base, 'Record Header\Record Flags\Has Distant LOD')) then begin
-    AddMessage('Base record ' + Name(base) + ' does not have distant LOD.');
-    Remove(e);
-    Exit;
-  end;
 
-  lod := GetElementEditValues(base, 'MNAM\LOD #0 (Level 0)\Mesh');
-  if lod = '' then begin
-    AddMessage('Base record ' + Name(base) + ' does not have a LOD mesh.');
-    Remove(e);
-    Exit;
-  end;
 
-  if GetFile(base) <> GetFile(e) then begin
-    basecopy := wbCopyElementToFile(base, GetFile(e), False, True);
-    SetElementEditValues(basecopy, 'Model\MODL', lod);
-  end else begin
-    SetElementEditValues(base, 'Model\MODL', lod);
-  end;
+  // if Pos(Signature(base), signatures) = 0 then begin
+  //   AddMessage('Base record ' + Name(base) + ' is not a valid type: ' + Signature(base));
+  //   Remove(e);
+  //   Exit;
+  // end;
+
+  // if not StrToBool(GetElementEditValues(base, 'Record Header\Record Flags\Has Distant LOD')) then begin
+  //   AddMessage('Base record ' + Name(base) + ' does not have distant LOD.');
+  //   Remove(e);
+  //   Exit;
+  // end;
+
+  // lod := GetElementEditValues(base, 'MNAM\LOD #0 (Level 0)\Mesh');
+  // if lod = '' then begin
+  //   AddMessage('Base record ' + Name(base) + ' does not have a LOD mesh.');
+  //   Remove(e);
+  //   Exit;
+  // end;
+
+  // if GetFile(base) <> GetFile(e) then begin
+  //   basecopy := wbCopyElementToFile(base, GetFile(e), False, True);
+  //   SetElementEditValues(basecopy, 'Model\MODL', lod);
+  // end else begin
+  //   SetElementEditValues(base, 'Model\MODL', lod);
+  // end;
 
   // previousOverride := MasterOrSelf(e);
   // layer := GetElementEditValues(previousOverride, 'XLYR');

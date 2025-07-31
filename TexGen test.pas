@@ -15,7 +15,7 @@ const
     texgen_texture_example6 = 'Textures\setdressing\drivein\driveindetails01_d.dds';
 
 var
-    slTexgen_Noalpha, slTexgen_Copy: TStringList;
+    slTexgen_noalpha, slTexgen_copy, slTexgen_alpha: TStringList;
 
 
 
@@ -36,12 +36,13 @@ begin
     // ListStringsInStringList(slTexgen_Noalpha);
     // ListStringsInStringList(slTexgen_Copy);
 
-    // GetTexGenFromTexture(texgen_texture_example1);
-    // GetTexGenFromTexture(texgen_texture_example2);
-    // GetTexGenFromTexture(texgen_texture_example3);
-    // GetTexGenFromTexture(texgen_texture_example4);
-    // GetTexGenFromTexture(texgen_texture_example5);
+    GetTexGenFromTexture(texgen_texture_example1);
+    GetTexGenFromTexture(texgen_texture_example2);
+    GetTexGenFromTexture(texgen_texture_example3);
+    GetTexGenFromTexture(texgen_texture_example4);
+    GetTexGenFromTexture(texgen_texture_example5);
     GetTexGenFromTexture(texgen_texture_example6);
+    AddMessage(StripNonAlphanumeric('FOLIP - New Lods.esp'));
 end;
 
 // called for every record selected in xEdit
@@ -61,6 +62,21 @@ begin
     slTexgen_Copy.Free;
 end;
 
+function StripNonAlphanumeric(Input: string): string;
+var
+  i: Integer;
+  c: char;
+begin
+    Result := '';
+    i := 1;
+    while i <= Length(Input) do begin
+        c := Copy(Input,i,1);
+        if Pos(c,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789') <> 0 then Result := Result + c;
+        inc(i);
+    end;
+end;
+
+
 function GetTexGenFromTexture(texture: string): integer;
 {
     Given a texture path, return the relevant TexGen lines.
@@ -68,10 +84,11 @@ function GetTexGenFromTexture(texture: string): integer;
 var
     i, c, t: integer;
     slTexgen_lines, slLine, slTextureList: TStringList;
-    bTextureMatch: boolean;
+    bTextureMatch, bCanAutomate: boolean;
     size: string;
 begin
     Result := 0;
+    bCanAutomate := True;
 
     size := GetTextureInfo(texture);
     AddMessage(size);
@@ -94,7 +111,7 @@ begin
 
                 slLine := TStringList.Create;
                 try
-                    slTexgen_lines.Add(slTexgen_Noalpha[i]);
+                    //slTexgen_lines.Add(slTexgen_Noalpha[i]);
                     slLine.Delimiter := #9; // Set delimiter to tab character
                     slLine.DelimitedText := slTexgen_Noalpha[i];
 
@@ -102,27 +119,31 @@ begin
                         continue;
                     end else if slLine[5] = 'x' then begin // skip x lines (temporary texture setup for mipmaps, typically for adjusting specular, which we should do automatically)
                         slTextureList.Add(TrimLeftChars(slLine[9], 5)); // Add the texture to the match list, removing the d.dds suffix
-                        continue;
+                        //continue;
                     end else if slLine[5] = 'r' then begin // skip r lines (rotation lines)
                         slTextureList.Add(slLine[9]); // Add the texture to the match list
+                        bCanAutomate := False; // We don't want to automate this
                         continue;
                     end;
 
                     if ContainsText(slLine[9], 'DynDOLOD-Temp') then begin // This one is complicated. Temporary texture(s) are being used to create the new lod texture.
+
                         slTextureList.Add(slLine[9]); // Add the texture to the match list
-                        continue; // Skip for now.
+                        bCanAutomate := False;
+                        // continue; // Skip for now.
                     end;
 
-                    for c := 0 to Pred(slLine.Count) do begin
-                        slTexgen_lines.Add(slLine[c]);
-                    end;
+                    slTexgen_lines.Add(slTexgen_Noalpha[i]);
+                    // for c := 0 to Pred(slLine.Count) do begin
+                    //     slTexgen_lines.Add(slLine[c]);
+                    // end;
                 finally
                     slLine.Free;
                 end;
             end;
         end;
     finally
-        ListStringsInStringList(slTexgen_lines);
+        if bCanAutomate then ListStringsInStringList(slTexgen_lines);
         slTexgen_lines.Free;
         slTextureList.Free;
     end;
