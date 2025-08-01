@@ -107,7 +107,7 @@ begin
                 for j := 0 to Pred(slFiles.Count) do begin
                     f := LowerCase(slFiles[j]);
                     if not SameText(RightStr(f,4),'.dds') then continue;
-                    if IsCubeMap(f) then begin
+                    if IsCubeMap(slContainers[i], f) then begin
                         folder := ExtractFilePath(f);
                         filename := ExtractFileName(f);
                         outfile := output + folder + filename;
@@ -127,7 +127,7 @@ begin
     end;
 end;
 
-function IsCubeMap(f: string): Boolean;
+function IsCubeMap(cont, f: string): Boolean;
 {
     Check if a DDS file is a cubemap.
 }
@@ -137,7 +137,7 @@ begin
     dds := TwbDDSFile.Create;
     try
         try
-            dds.LoadFromResource(f);
+            dds.LoadFromResource(cont, f);
             if dds.EditValues['Magic'] <> 'DDS ' then
                 raise Exception.Create('Not a valid DDS file');
         except
@@ -145,7 +145,12 @@ begin
                 AddMessage('Error reading: ' + f + ' <' + E.Message + '>');
             end;
         end;
+
         Result := dds.NativeValues['HEADER\dwCaps2\DDSCAPS2_CUBEMAP'];
+        if not Result and (dds.NativeValues['HEADER\dwWidth']/dds.NativeValues['HEADER\dwHeight'] = 4/3) then begin
+            // If the cubemap is not flagged, but the width/height ratio is 4:3, assume it is a cubemap.
+            AddMessage('Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
+        end;
     finally
         dds.Free;
     end;
@@ -161,8 +166,15 @@ begin
         f := slCubemaps[i];
         dir := output + TrimLeftChars(ExtractFilePath(f), 1);
         filepath := output + f;
-        cmdline := '-f B8G8R8A8_UNORM -m 8 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
         AddMessage('Processing ' + f);
+
+        //B8G8R8X8_UNORM first to strip alpha
+        cmdline := '-f B8G8R8X8_UNORM -m 1 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
+        AddMessage('Command line: "' + texconv + '" ' + cmdline);
+        AddMessage('Texconv finished with exit code: ' + IntToStr(ShellExecuteWait(0, 'open', texconv, cmdline, '', SW_HIDE)));
+
+        //B8G8R8A8_UNORM
+        cmdline := '-f B8G8R8A8_UNORM -m 8 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
         AddMessage('Command line: "' + texconv + '" ' + cmdline);
         AddMessage('Texconv finished with exit code: ' + IntToStr(ShellExecuteWait(0, 'open', texconv, cmdline, '', SW_HIDE)));
     end;
