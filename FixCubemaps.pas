@@ -9,6 +9,8 @@ unit Cubemaps;
 
 var
     uiScale: integer;
+    slCubemaps: TStringList;
+    output: string;
 
 // ----------------------------------------------------
 // Main functions and procedures go up immediately below.
@@ -23,10 +25,17 @@ begin
     uiScale := Screen.PixelsPerInch * 100 / 96;
     AddMessage('UI scale: ' + IntToStr(uiScale));
 
-    if not MainMenuForm then begin
-        Result := 1;
-        Exit;
-    end;
+    output := wbScriptsPath + 'FixCubemaps\';
+
+    slCubemaps := TStringList.Create;
+
+    // if not MainMenuForm then begin
+    //     Result := 1;
+    //     Exit;
+    // end;
+
+    CollectAssets;
+    ConvertCubemaps;
 
     Result := 0;
 end;
@@ -35,8 +44,128 @@ function Finalize: integer;
 {
     This function is called at the end.
 }
+var
+    cmdline: string;
 begin
+    AddMessage('Zipping up cubemaps for easy installation...');
+    cmdline := '-Command "Compress-Archive -Path ''' + output + '\textures'' -DestinationPath ''' + output + 'FixCubemaps.zip''"';
+    AddMessage(cmdline);
+    AddMessage('Exit Code: ' + IntToStr(ShellExecuteWait(0, 'open', 'Powershell', cmdline, '', SW_SHOWNORMAL)));
+
+    ListStringsInStringList(slCubemaps);
+    slCubemaps.Free;
     Result := 0;
+end;
+
+procedure CollectAssets;
+{
+    Collect assets
+}
+var
+    slContainers: TwbFastStringList;
+    slFiles: TStringList;
+    i, j: integer;
+    archive, f, folder, filename, outfile: string;
+    joTextureContainer: TJsonObject;
+begin
+    AddMessage('Scanning assets for cubemaps. This may take awhile.');
+    slContainers := TwbFastStringList.Create;
+    joTextureContainer := TJsonObject.Create;
+    try
+        ResourceContainerList(slContainers);
+
+        for i := Pred(slContainers.Count) downto 0 do begin
+            archive := TrimRightChars(slContainers[i], Length(wbDataPath));
+            //Skip archives that will not contain cubemaps
+            if ContainsText(archive, ' - Animations.ba2') then continue;
+            if ContainsText(archive, ' - Interface.ba2') then continue;
+            if ContainsText(archive, ' - Materials.ba2') then continue;
+            if ContainsText(archive, ' - Meshes.ba2') then continue;
+            if ContainsText(archive, ' - MeshesExtra.ba2') then continue;
+            if ContainsText(archive, ' - Misc.ba2') then continue;
+            if ContainsText(archive, ' - Nvflex.ba2') then continue;
+            if ContainsText(archive, ' - Shaders.ba2') then continue;
+            if ContainsText(archive, ' - Sounds.ba2') then continue;
+            if ContainsText(archive, ' - Voices.ba2') then continue;
+            if ContainsText(archive, ' - Voices_cn.ba2') then continue;
+            if ContainsText(archive, ' - Voices_de.ba2') then continue;
+            if ContainsText(archive, ' - Voices_en.ba2') then continue;
+            if ContainsText(archive, ' - Voices_es.ba2') then continue;
+            if ContainsText(archive, ' - Voices_esmx.ba2') then continue;
+            if ContainsText(archive, ' - Voices_fr.ba2') then continue;
+            if ContainsText(archive, ' - Voices_it.ba2') then continue;
+            if ContainsText(archive, ' - Voices_ja.ba2') then continue;
+            if ContainsText(archive, ' - Voices_pl.ba2') then continue;
+            if ContainsText(archive, ' - Voices_ptbr.ba2') then continue;
+            if ContainsText(archive, ' - Voices_ru.ba2') then continue;
+            if SameText(archive,'') then AddMessage('Scanning loose files for cubemaps') else AddMessage('Scanning archive for cubemaps: ' + archive);
+
+            slFiles := TStringList.Create;
+            try
+                ResourceList(slContainers[i], slFiles);
+
+                for j := 0 to Pred(slFiles.Count) do begin
+                    f := LowerCase(slFiles[j]);
+                    if not SameText(RightStr(f,4),'.dds') then continue;
+                    if IsCubeMap(f) then begin
+                        folder := ExtractFilePath(f);
+                        filename := ExtractFileName(f);
+                        outfile := output + folder + filename;
+                        if FileExists(outfile) then continue;
+                        slCubemaps.Add(f);
+                        AddMessage(#9 + 'Found cubemap: ' + f);
+                        EnsureDirectoryExists(output + folder);
+                        ResourceCopy(slContainers[i], f, outfile);
+                    end;
+                end;
+            finally
+                slFiles.Free;
+            end;
+        end;
+    finally
+        slContainers.Free;
+    end;
+end;
+
+function IsCubeMap(f: string): Boolean;
+{
+    Check if a DDS file is a cubemap.
+}
+var
+    dds: TwbDDSFile;
+begin
+    dds := TwbDDSFile.Create;
+    try
+        try
+            dds.LoadFromResource(f);
+            if dds.EditValues['Magic'] <> 'DDS ' then
+                raise Exception.Create('Not a valid DDS file');
+        except
+            on E: Exception do begin
+                AddMessage('Error reading: ' + f + ' <' + E.Message + '>');
+            end;
+        end;
+        Result := dds.NativeValues['HEADER\dwCaps2\DDSCAPS2_CUBEMAP'];
+    finally
+        dds.Free;
+    end;
+end;
+
+procedure ConvertCubemaps;
+var
+    i: integer;
+    f, texconv, dir, filepath, cmdline: string;
+begin
+    texconv := wbScriptsPath + 'Texconvx64.exe';
+    for i:=0 to Pred(slCubemaps.Count) do begin
+        f := slCubemaps[i];
+        dir := output + TrimLeftChars(ExtractFilePath(f), 1);
+        filepath := output + f;
+        cmdline := '-f B8G8R8A8_UNORM -m 8 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
+        AddMessage('Processing ' + f);
+        AddMessage('Command line: "' + texconv + '" ' + cmdline);
+        AddMessage('Texconv finished with exit code: ' + IntToStr(ShellExecuteWait(0, 'open', texconv, cmdline, '', SW_HIDE)));
+    end;
 end;
 
 function MainMenuForm: Boolean;
@@ -116,6 +245,42 @@ begin
     if not DirectoryExists(f) then
         if not ForceDirectories(f) then
             raise Exception.Create('Can not create destination directory ' + f);
+end;
+
+function TrimRightChars(s: string; chars: integer): string;
+{
+    Returns right string - chars
+}
+begin
+    Result := RightStr(s, Length(s) - chars);
+end;
+
+function TrimLeftChars(s: string; chars: integer): string;
+{
+    Returns left string - chars
+}
+begin
+    Result := LeftStr(s, Length(s) - chars);
+end;
+
+function BoolToStr(b: boolean): string;
+{
+    Given a boolean, return a string.
+}
+begin
+    if b then Result := 'true' else Result := 'false';
+end;
+
+procedure ListStringsInStringList(sl: TStringList);
+{
+    Given a TStringList, add a message for all items in the list.
+}
+var
+    i: integer;
+begin
+    AddMessage('=======================================================================================');
+    for i := 0 to Pred(sl.Count) do AddMessage(sl[i]);
+    AddMessage('=======================================================================================');
 end;
 
 end.
