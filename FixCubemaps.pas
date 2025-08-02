@@ -26,6 +26,7 @@ begin
     AddMessage('UI scale: ' + IntToStr(uiScale));
 
     output := wbScriptsPath + 'FixCubemaps\';
+    DeleteDirectory(wbScriptsPath + 'FixCubemaps');
 
     slCubemaps := TStringList.Create;
 
@@ -48,7 +49,7 @@ var
     cmdline: string;
 begin
     AddMessage('Zipping up cubemaps for easy installation...');
-    cmdline := '-Command "Compress-Archive -Path ''' + output + '\textures'' -DestinationPath ''' + output + 'FixCubemaps.zip''"';
+    cmdline := '-Command "Compress-Archive -Path ''' + output + 'textures'' -DestinationPath ''' + output + 'FixCubemaps.zip''"';
     AddMessage(cmdline);
     AddMessage('Exit Code: ' + IntToStr(ShellExecuteWait(0, 'open', 'Powershell', cmdline, '', SW_SHOWNORMAL)));
 
@@ -256,7 +257,44 @@ procedure EnsureDirectoryExists(f: string);
 begin
     if not DirectoryExists(f) then
         if not ForceDirectories(f) then
-            raise Exception.Create('Can not create destination directory ' + f);
+            raise Exception.Create('Cannot create destination directory ' + f);
+end;
+
+function DeleteDirectory(dir: string): boolean;
+var
+    srFind : TSearchRec;
+    f: string;
+begin
+    Result := True;
+    if not DirectoryExists(dir) then Exit;
+
+    if FindFirst(dir + '\*', faAnyFile, srFind) = 0 then begin
+        repeat
+            if ((srFind.Name <> '.') and (srFind.Name <> '..')) then begin
+                f := dir + '\' + srFind.Name;
+
+                if ((srFind.attr and faDirectory) = faDirectory) then begin
+                    if (not DeleteDirectory(f)) then begin
+                        Result := False;
+                        Exit;
+                    end;
+                end
+                else begin
+                    if (not DeleteFile(f)) then begin
+                        Result := False;
+                        Exit;
+                    end;
+                end;
+            end;
+        until FindNext(srFind) <> 0;
+
+        FindClose(srFind);
+    end;
+
+    if (not RemoveDir(dir)) then begin
+        Result := False;
+        Exit;
+    end;
 end;
 
 function TrimRightChars(s: string; chars: integer): string;
