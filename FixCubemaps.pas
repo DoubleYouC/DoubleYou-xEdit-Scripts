@@ -9,7 +9,7 @@ unit Cubemaps;
 
 var
     uiScale: integer;
-    slCubemaps: TStringList;
+    slCubemaps, slWarnings: TStringList;
     output: string;
 
 // ----------------------------------------------------
@@ -29,6 +29,7 @@ begin
     DeleteDirectory(wbScriptsPath + 'FixCubemaps');
 
     slCubemaps := TStringList.Create;
+    slWarnings := TStringList.Create;
 
     // if not MainMenuForm then begin
     //     Result := 1;
@@ -53,8 +54,13 @@ begin
     AddMessage(cmdline);
     AddMessage('Exit Code: ' + IntToStr(ShellExecuteWait(0, 'open', 'Powershell', cmdline, '', SW_SHOWNORMAL)));
 
-    ListStringsInStringList(slCubemaps);
+    ListStringsInStringList(slWarnings);
     slCubemaps.Free;
+    slWarnings.Free;
+
+    // Open the output folder in Explorer
+    cmdline := '"'+ wbScriptsPath + 'FixCubemaps"';
+    ShellExecute(0, 'open', 'explorer', cmdline, '', SW_SHOWNORMAL);
     Result := 0;
 end;
 
@@ -144,6 +150,7 @@ begin
         except
             on E: Exception do begin
                 AddMessage('Error reading: ' + f + ' <' + E.Message + '>');
+                slWarnings.Add('Error reading: ' + f + ' <' + E.Message + '>');
             end;
         end;
 
@@ -151,6 +158,12 @@ begin
         if not Result and (dds.NativeValues['HEADER\dwWidth']/dds.NativeValues['HEADER\dwHeight'] = 4/3) then begin
             // If the cubemap is not flagged, but the width/height ratio is 4:3, assume it is a cubemap.
             AddMessage('Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
+            slWarnings.Add('Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
+        end;
+    except
+        on E: Exception do begin
+            AddMessage('Error reading: ' + f + ' <' + E.Message + '>');
+            slWarnings.Add('Error reading: ' + f + ' <' + E.Message + '>');
         end;
     finally
         dds.Free;
@@ -170,13 +183,14 @@ begin
         AddMessage('Processing ' + f);
 
         //B8G8R8X8_UNORM first to strip alpha
-        cmdline := '-f B8G8R8X8_UNORM -m 1 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
-        AddMessage('Command line: "' + texconv + '" ' + cmdline);
-        AddMessage('Texconv finished with exit code: ' + IntToStr(ShellExecuteWait(0, 'open', texconv, cmdline, '', SW_HIDE)));
+        //Commented out as I doubt it is necessary.
+        // cmdline := '-f B8G8R8X8_UNORM -m 1 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
+        // AddMessage('Command line: "' + texconv + '" ' + cmdline);
+        // AddMessage('Texconv finished with exit code: ' + IntToStr(ShellExecuteWait(0, 'open', texconv, cmdline, '', SW_HIDE)));
 
         //B8G8R8A8_UNORM
         cmdline := '-f B8G8R8A8_UNORM -m 8 -y -w 128 -h 128 -o "' + dir + '" "' + filepath + '"';
-        AddMessage('Command line: "' + texconv + '" ' + cmdline);
+        // AddMessage('Command line: "' + texconv + '" ' + cmdline);
         AddMessage('Texconv finished with exit code: ' + IntToStr(ShellExecuteWait(0, 'open', texconv, cmdline, '', SW_HIDE)));
     end;
 end;
@@ -326,10 +340,12 @@ procedure ListStringsInStringList(sl: TStringList);
     Given a TStringList, add a message for all items in the list.
 }
 var
-    i: integer;
+    i, count: integer;
 begin
+    count := sl.Count;
+    if count < 1 then Exit;
     AddMessage('=======================================================================================');
-    for i := 0 to Pred(sl.Count) do AddMessage(sl[i]);
+    for i := 0 to Pred(count) do AddMessage(sl[i]);
     AddMessage('=======================================================================================');
 end;
 
