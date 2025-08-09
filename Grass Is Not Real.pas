@@ -3,6 +3,9 @@
 }
 unit MakeGrassNotReal;
 
+const
+    SCALE_FACTOR_TERRAIN = 8;
+
 var
     joGrass: TJsonObject;
     plugin: IwbFile;
@@ -13,7 +16,7 @@ var
 function Initialize: integer;
 begin
     joGrass := TJsonObject.Create;
-    sIgnoredWorldspaces := '000F93:Fallout4.esm,000810:DLCCoast.esm,0014F4:DLCCoast.esm,008B56:DLCNukaWorld.esm';
+    sIgnoredWorldspaces := '000F93:Fallout4.esm,0A7FF4:Fallout4.esm,000810:DLCCoast.esm,0014F4:DLCCoast.esm,008B56:DLCNukaWorld.esm';
 
     CreatePluginList;
     CreatePlugin;
@@ -45,7 +48,7 @@ end;
 procedure CreatePlugin;
 begin
     plugin := AddNewFile;
-    AddMasterIfMissing(plugin, 'Fallout4.esm');
+    AddMasterIfMissing(plugin, GetFileName(FileByIndex(0)));
     statGroup := Add(plugin, 'STAT', True);
     scolGroup := Add(plugin, 'SCOL', True);
     slPluginFiles.Add(GetFileName(plugin));
@@ -53,7 +56,7 @@ end;
 
 procedure CollectLand;
 var
-    i, j, k, idx: integer;
+    i, j, k, idx, total: integer;
     f: IwbFile;
     g: IwbGroupRecord;
     r, gnams, gnam, land: IwbElement;
@@ -112,8 +115,12 @@ begin
         end;
 
         // Now that we have all the LAND records that should get grass, we will iterate over them and add static grass to them.
-        for i := 0 to Pred(tlLand.Count) do begin
+        total := tlLand.Count;
+        for i := 0 to Pred(total) do begin
             land := ObjectToElement(tlLand[i]);
+            if i mod 10 = 0 then begin
+                AddMessage('Processed ' + IntToStr(i + 1) + ' of ' + IntToStr(total) + ' landscape records.');
+            end;
             AddStaticGrassToLand(land);
         end;
     finally
@@ -126,9 +133,9 @@ end;
 
 function AddStaticGrassToLand(land: IwbElement): integer;
 var
-    rCell, rWrld, nCell, landHeightData, grassSCOL, grassSCOLRef: IwbElement;
+    rCell, rWrld, nCell, landHeightData, grassSCOL, grassSCOLRef, base: IwbElement;
     cellX, cellY, unitsX, unitsY, row, column: integer;
-    wrldLandZ, landOffsetZ, landHeightZ, rowColumnOffsetZ: double;
+    waterHeightZ, landOffsetZ, rowColumnOffsetZ: double;
     rowColumn, pX, pY, pZ, rX, rY, rZ, scale, grassSCOLFormid, landRecordId, grassHere: string;
     joGrassSCOL: TJsonObject;
 begin
@@ -140,9 +147,13 @@ begin
     unitsX := cellX * 4096;
     unitsY := cellY * 4096;
 
-    wrldLandZ := GetElementNativeValues(rWrld, 'DNAM\Default Land Height');
+    if GetElementEditValues(rCell, 'XCLW') <> 'Default' then begin
+        waterHeightZ := GetElementNativeValues(rCell, 'XCLW');
+    end
+    else begin
+        waterHeightZ := GetElementNativeValues(rWrld, 'DNAM\Default Water Height');
+    end;
     landOffsetZ := GetElementNativeValues(land, 'VHGT\Offset');
-    landHeightZ := wrldLandZ + landOffsetZ;
 
     landHeightData := ElementByPath(land, 'VHGT\Height Data');
 
@@ -152,15 +163,16 @@ begin
     try
         for row := 0 to 32 do begin
             for column := 0 to 32 do begin
+                if random(10) > 0 then continue;
                 rowColumn := 'Row #' + IntToStr(row) + '\Column #' + IntToStr(column);
                 rowColumnOffsetZ := GetElementNativeValues(landHeightData, rowColumn);
-                pX := FloatToStr(unitsX + (column * 128));
-                pY := FloatToStr(unitsY + (row * 128));
-                pZ := FloatToStr(rowColumnOffsetZ);
+                pX := FloatToStr(column * 128);
+                pY := FloatToStr(row * 128);
+                pZ := FloatToStr((rowColumnOffsetZ + landOffsetZ) * SCALE_FACTOR_TERRAIN);
 
                 rx := '0.0';
                 rY := '0.0';
-                rZ := '0.0';
+                rZ := IntToStr(Random(360));
                 scale := '1.0';
 
                 grassHere := GetRandomGrass(landRecordId);
@@ -178,10 +190,14 @@ begin
     nCell := wbCopyElementToFile(rCell, plugin, False, True);
     grassSCOLRef := Add(nCell, 'REFR', True);
     grassSCOLFormid := IntToHex(GetLoadOrderFormID(grassSCOL), 8);
-    SetElementEditValues(grassSCOLRef, 'Name', grassSCOLFormid);
+
     SetElementEditValues(grassSCOLRef, 'DATA\Position\X', IntToStr(unitsX));
     SetElementEditValues(grassSCOLRef, 'DATA\Position\Y', IntToStr(unitsY));
-    SetElementEditValues(grassSCOLRef, 'DATA\Position\Z', FloatToStr(landHeightZ));
+    SetElementEditValues(grassSCOLRef, 'DATA\Position\Z', FloatToStr(waterHeightZ));
+
+    base := ElementByPath(grassSCOLRef, 'NAME');
+    SetEditValue(base, grassSCOLFormid);
+    //raise Exception.Create('debug');
 
     Result := 0;
 end;
@@ -199,7 +215,7 @@ function MakeSCOLFromJson(joSCOL: TJsonObject; sSCOLEditorId: string): IwbElemen
 }
 var
     a, c, n, DelimPos, t: integer;
-    placementValue, Token, key: string;
+    placementValue, Token, key, onamValue: string;
     scol, stat, parts, part, onam, placement, placements: IwbElement;
 begin
     //Add SCOL record to SCOL group
@@ -216,12 +232,11 @@ begin
     for c := 0 to Pred(joSCOL.Count) do begin
         key := joSCOL.Names[c];
         stat := GetRecordFromFormIdFileId(key);
-        //AddMessage(key);
 
         // Add ONAM for each key (base STAT)
         part := Add(parts, 'Part', True);
         onam := ElementByPath(part, 'ONAM');
-        SetEditValue(onam, IntToHex(GetLoadOrderFormID(stat), 8));
+        onamValue := SetEditValue(onam, ShortName(stat));
 
         placements := Add(part, 'DATA', True);
         for a := 0 to Pred(joSCOL.O[key].A['Placements'].Count) do begin
@@ -255,6 +270,7 @@ begin
             end;
         end;
     end;
+    Result := scol;
     //AddMessage('Total placements: ' + IntToStr(t));
 end;
 
@@ -320,7 +336,7 @@ end;
 
 function RecordFormIdFileId(e: IwbElement): string;
 {
-    Returns the record ID of an element as formid:filename.
+    Returns the record ID of an element.
 }
 begin
     Result := TrimRightChars(IntToHex(FixedFormID(e), 8), 2) + ':' + GetFileName(GetFile(MasterOrSelf(e)));
@@ -331,12 +347,15 @@ function GetRecordFromFormIdFileId(recordId: string): IwbElement;
     Returns the record from the given formid:filename.
 }
 var
-    colonPos, recordFormId: integer;
+    colonPos, recordFormId, c: integer;
     f: IwbFile;
+    fileMasterIndex: string;
 begin
     colonPos := Pos(':', recordId);
-    recordFormId := StrToInt('$' + Copy(recordId, 1, Pred(colonPos)));
     f := FileByIndex(slPluginFiles.IndexOf(Copy(recordId, Succ(colonPos), Length(recordId))));
+    c := MasterCount(f);
+    if c > 9 then fileMasterIndex := IntToStr(c) else fileMasterIndex := '0' + IntToStr(c);
+    recordFormId := StrToInt('$' + fileMasterIndex + Copy(recordId, 1, Pred(colonPos)));
     Result := RecordByFormID(f, recordFormId, False);
 end;
 
