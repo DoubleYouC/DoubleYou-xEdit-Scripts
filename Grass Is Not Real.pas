@@ -135,7 +135,7 @@ function AddStaticGrassToLand(land: IwbElement): integer;
 var
     rCell, rWrld, nCell, landHeightData, grassSCOL, grassSCOLRef, base: IwbElement;
     cellX, cellY, unitsX, unitsY, row, column: integer;
-    waterHeightZ, landOffsetZ, rowColumnOffsetZ: double;
+    waterHeightZ, landOffsetZ, rowColumnOffsetZ, rowStartVal, landValue: float;
     rowColumn, pX, pY, pZ, rX, rY, rZ, scale, grassSCOLFormid, landRecordId, grassHere: string;
     joGrassSCOL: TJsonObject;
 begin
@@ -147,12 +147,13 @@ begin
     unitsX := cellX * 4096;
     unitsY := cellY * 4096;
 
-    if GetElementEditValues(rCell, 'XCLW') <> 'Default' then begin
-        waterHeightZ := GetElementNativeValues(rCell, 'XCLW');
-    end
-    else begin
-        waterHeightZ := GetElementNativeValues(rWrld, 'DNAM\Default Water Height');
-    end;
+    // if GetElementEditValues(rCell, 'XCLW') <> 'Default' then begin
+    //     waterHeightZ := GetElementNativeValues(rCell, 'XCLW');
+    // end
+    // else begin
+    //     waterHeightZ := GetElementNativeValues(rWrld, 'DNAM\Default Water Height');
+    // end;
+
     landOffsetZ := GetElementNativeValues(land, 'VHGT\Offset');
 
     landHeightData := ElementByPath(land, 'VHGT\Height Data');
@@ -163,12 +164,30 @@ begin
     try
         for row := 0 to 32 do begin
             for column := 0 to 32 do begin
-                if random(10) > 0 then continue;
+
                 rowColumn := 'Row #' + IntToStr(row) + '\Column #' + IntToStr(column);
                 rowColumnOffsetZ := GetElementNativeValues(landHeightData, rowColumn);
+                if rowColumnOffsetZ > 127 then rowColumnOffsetZ := rowColumnOffsetZ - 256;
+
+                if(column = 0) then begin
+                    if(row = 0) then begin
+                        rowStartVal := rowColumnOffsetZ + landOffsetZ;
+                    end else begin
+                        rowStartVal := rowColumnOffsetZ + rowStartVal;
+                    end;
+
+                    landValue := rowStartVal;
+                end else begin
+                    // otherwise, just keep incrementing
+                    landValue := landValue + rowColumnOffsetZ;
+                end;
+                if random(10) > 0 then continue;
+
+
+
                 pX := FloatToStr(column * 128);
                 pY := FloatToStr(row * 128);
-                pZ := FloatToStr((rowColumnOffsetZ + landOffsetZ) * SCALE_FACTOR_TERRAIN);
+                pZ := FloatToStr(landValue * SCALE_FACTOR_TERRAIN);
 
                 rx := '0.0';
                 rY := '0.0';
@@ -193,7 +212,7 @@ begin
 
     SetElementEditValues(grassSCOLRef, 'DATA\Position\X', IntToStr(unitsX));
     SetElementEditValues(grassSCOLRef, 'DATA\Position\Y', IntToStr(unitsY));
-    SetElementEditValues(grassSCOLRef, 'DATA\Position\Z', FloatToStr(waterHeightZ));
+    SetElementEditValues(grassSCOLRef, 'DATA\Position\Z', '0.0');
 
     base := ElementByPath(grassSCOLRef, 'NAME');
     SetEditValue(base, grassSCOLFormid);
