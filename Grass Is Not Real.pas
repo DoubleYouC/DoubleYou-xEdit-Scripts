@@ -106,10 +106,10 @@ begin
                     if Signature(land) <> 'LAND' then continue;
                     landRecordId := RecordFormIdFileId(land);
                     idx := slLand.IndexOf(landRecordId);
+                    joGrass.O['Cells'].O[landRecordId].A['Landscape Textures'].Add(recordId);
                     if idx > -1 then continue;
                     slLand.Add(landRecordId);
                     tlLand.Add(land);
-                    joGrass.O['Cells'].O[landRecordId].A['Landscape Textures'].Add(recordId);
                 end;
             end;
         end;
@@ -181,7 +181,7 @@ begin
                     // otherwise, just keep incrementing
                     landValue := landValue + rowColumnOffsetZ;
                 end;
-                if random(10) > 0 then continue;
+                //if random(10) > 0 then continue;
 
 
 
@@ -216,7 +216,8 @@ begin
 
     base := ElementByPath(grassSCOLRef, 'NAME');
     SetEditValue(base, grassSCOLFormid);
-    //raise Exception.Create('debug');
+    // joGrass.SaveToFile(wbDataPath + 'GrassIsNotReal.json');
+    // raise Exception.Create('debug');
 
     Result := 0;
 end;
