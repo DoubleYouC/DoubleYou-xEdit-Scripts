@@ -96,7 +96,7 @@ begin
     slTexgen_lines := TStringList.Create;
     slTextureList := TStringList.Create;
     try
-        slTextureList.Add(texture);
+        slTextureList.Add(ChangeFullToLodDirectory(texture)); // Add the texture to the match list
         for i := 0 to Pred(slTexgen_Noalpha.Count) do begin
             bTextureMatch := False;
 
@@ -129,8 +129,8 @@ begin
                     if ContainsText(slLine[9], 'DynDOLOD-Temp') then begin // This one is complicated. Temporary texture(s) are being used to create the new lod texture.
 
                         slTextureList.Add(slLine[9]); // Add the texture to the match list
-                        bCanAutomate := False;
-                        // continue; // Skip for now.
+                        //bCanAutomate := False;
+                        continue; // Skip for now.
                     end;
 
                     slTexgen_lines.Add(slTexgen_Noalpha[i]);
@@ -203,6 +203,31 @@ begin
         Result := IntToStr(height) + 'x' + IntToStr(width);
     finally
         dds.Free;
+    end;
+end;
+
+function ChangeFullToLodDirectory(f: string): string;
+{
+    Given a file path, changes the directory to the LOD directory.
+    f is the file path.
+}
+var
+    parts: TStringDynArray;
+    slTopLevelModPatternPaths: TStringList;
+begin
+    parts := SplitString(f, '\');
+    slTopLevelModPatternPaths := TStringList.Create;
+    slTopLevelModPatternPaths.Add('dlc03');
+    try
+        if slTopLevelModPatternPaths.IndexOf(parts[1]) = -1 then begin
+            //meshes\path\to\model.nif to meshes\lod\path\to\model.nif
+            Result := StringReplace(f, parts[0], parts[0] + '\lod', [rfIgnoreCase]);
+        end else begin
+            //meshes\dlc03\path\to\model.nif to meshes\dlc03\lod\path\to\model.nif
+            Result := StringReplace(f, parts[1], parts[1] + '\lod', [rfIgnoreCase]);
+        end;
+    finally
+        slTopLevelModPatternPaths.Free;
     end;
 end;
 
