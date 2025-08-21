@@ -67,30 +67,32 @@ var
     block: TwbNifBlock;
 begin
     Result := False;
-    nif := TwbNifFile.Create;
     try
-        nif.LoadFromResource(model);
-        for i := 0 to Pred(nif.BlocksCount) do begin
-            block := nif.Blocks[i];
-            if ((block.BlockType = 'BSTrishape') or (block.BlockType = 'BSMeshLODTriShape')) then blockName := block.EditValues['Name'];
-            if not ((block.BlockType = 'BSLightingShaderProperty') or (block.BlockType = 'BSEffectShaderProperty')) then continue;
-            mat := wbNormalizeResourceName(block.EditValues['Name'], resMaterial);
-            matExt := ExtractFileExt(mat);
-            if not (SameText(matExt, '.bgsm') or SameText(matExt, '.bgem')) then begin
-                slNeedsMaterials.Add('Model may need a ' + block.BlockType + ' material: ' + #9 + ShortName(stat) + #9 + model + #9 + blockName);
-                bBlockMissingMat := True;
-                Result := True;
-            end else begin
-                if not ResourceExists(mat) then begin
+        nif := TwbNifFile.Create;
+        try
+            nif.LoadFromResource(model);
+            for i := 0 to Pred(nif.BlocksCount) do begin
+                block := nif.Blocks[i];
+                if ((block.BlockType = 'BSTrishape') or (block.BlockType = 'BSMeshLODTriShape')) then blockName := block.EditValues['Name'];
+                if not ((block.BlockType = 'BSLightingShaderProperty') or (block.BlockType = 'BSEffectShaderProperty')) then continue;
+                mat := wbNormalizeResourceName(block.EditValues['Name'], resMaterial);
+                matExt := ExtractFileExt(mat);
+                if not (SameText(matExt, '.bgsm') or SameText(matExt, '.bgem')) then begin
+                    slNeedsMaterials.Add('Model may need a ' + block.BlockType + ' material: ' + #9 + ShortName(stat) + #9 + model + #9 + blockName);
                     bBlockMissingMat := True;
                     Result := True;
-                    slMissingMaterials.Add('Material does not exist: ' + #9 + ShortName(stat) + #9 + model + #9 + mat + #9 + blockName);
+                end else begin
+                    if not ResourceExists(mat) then begin
+                        bBlockMissingMat := True;
+                        Result := True;
+                        slMissingMaterials.Add('Material does not exist: ' + #9 + ShortName(stat) + #9 + model + #9 + mat + #9 + blockName);
+                    end;
                 end;
             end;
+        finally
+            nif.Free;
         end;
-    except on E: Exception do slNifErrors.Add('Error reading NIF: ' + E.Message + ' ' + model);
-    finally
-        nif.Free;
+    except on E: Exception do slNifErrors.Add('Error reading NIF: ' + E.Message + #9 + ShortName(stat) + #9 + model);
     end;
 end;
 
