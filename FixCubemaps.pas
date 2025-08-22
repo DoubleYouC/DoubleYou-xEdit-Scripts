@@ -49,19 +49,20 @@ function Finalize: integer;
 var
     cmdline: string;
 begin
+    Result := 0;
+    slCubemaps.Free;
+
     AddMessage('Zipping up cubemaps for easy installation...');
     cmdline := '-Command "Compress-Archive -Path ''' + output + 'textures'' -DestinationPath ''' + output + 'FixCubemaps.zip''"';
     AddMessage(cmdline);
     AddMessage('Exit Code: ' + IntToStr(ShellExecuteWait(0, 'open', 'Powershell', cmdline, '', SW_SHOWNORMAL)));
 
-    ListStringsInStringList(slWarnings);
-    slCubemaps.Free;
-    slWarnings.Free;
-
     // Open the output folder in Explorer
     cmdline := '"'+ wbScriptsPath + 'FixCubemaps"';
     ShellExecute(0, 'open', 'explorer', cmdline, '', SW_SHOWNORMAL);
-    Result := 0;
+
+    ListStringsInStringList(slWarnings);
+    slWarnings.Free;
 end;
 
 procedure CollectAssets;
@@ -114,15 +115,22 @@ begin
                 for j := 0 to Pred(slFiles.Count) do begin
                     f := LowerCase(slFiles[j]);
                     if not SameText(RightStr(f,4),'.dds') then continue;
+
+                    folder := ExtractFilePath(f);
+                    filename := ExtractFileName(f);
+                    outfile := output + folder + filename;
+                    if FileExists(outfile) then continue; //skip cubemaps already winning and found... should speed things up a bit.
+
+                    if not ResourceExists(f) then continue; //apparently the file can still not exist even if it is found based off user logs, so check to make sure it exists.
+
                     if IsCubeMap(slContainers[i], f) then begin
-                        folder := ExtractFilePath(f);
-                        filename := ExtractFileName(f);
-                        outfile := output + folder + filename;
-                        if FileExists(outfile) then continue;
                         slCubemaps.Add(f);
                         AddMessage(#9 + 'Found cubemap: ' + f);
                         EnsureDirectoryExists(output + folder);
                         ResourceCopy(slContainers[i], f, outfile);
+                    end else if SameText(LeftStr(f,25),'textures\shared\cubemaps\') then begin
+                        AddMessage(#9 + 'Warning:' + #9 + f + #9 + 'from' + #9 + slContainers[i] + #9 + 'should probably be a cubemap, but it is not.');
+                        slWarnings.Add('Warning:' + #9 + f + #9 + 'from' + #9 + slContainers[i] + #9 + 'should probably be a cubemap, but it is not.');
                     end;
                 end;
             finally
@@ -141,29 +149,33 @@ function IsCubeMap(cont, f: string): Boolean;
 var
     dds: TwbDDSFile;
 begin
+    Result := False;
     dds := TwbDDSFile.Create;
     try
         try
             dds.LoadFromResource(cont, f);
-            if dds.EditValues['Magic'] <> 'DDS ' then
-                raise Exception.Create('Not a valid DDS file');
+            if dds.EditValues['Magic'] <> 'DDS ' then begin
+                AddMessage(#9 + 'Error reading: ' + f + ' <Not a valid DDS file>');
+                slWarnings.Add('Error reading: ' + f + ' <Not a valid DDS file>');
+                Exit;
+            end;
+            Result := dds.NativeValues['HEADER\dwCaps2\DDSCAPS2_CUBEMAP'];
+            if Result then Exit;
+            if (dds.NativeValues['HEADER\dwHeight'] = 0) then begin
+                AddMessage(#9 + 'Error reading: ' + f + ' <Height is 0>');
+                slWarnings.Add('Error reading: ' + f + ' <Height is 0>');
+                Exit;
+            end;
+            if (dds.NativeValues['HEADER\dwWidth']/dds.NativeValues['HEADER\dwHeight'] = 4/3) then begin
+                // If the cubemap is not flagged, but the width/height ratio is 4:3, assume it is a cubemap.
+                AddMessage(#9 + 'Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
+                slWarnings.Add('Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
+            end;
         except
             on E: Exception do begin
-                AddMessage('Error reading: ' + f + ' <' + E.Message + '>');
+                AddMessage(#9 + 'Error reading: ' + f + ' <' + E.Message + '>');
                 slWarnings.Add('Error reading: ' + f + ' <' + E.Message + '>');
             end;
-        end;
-
-        Result := dds.NativeValues['HEADER\dwCaps2\DDSCAPS2_CUBEMAP'];
-        if not Result and (dds.NativeValues['HEADER\dwWidth']/dds.NativeValues['HEADER\dwHeight'] = 4/3) then begin
-            // If the cubemap is not flagged, but the width/height ratio is 4:3, assume it is a cubemap.
-            AddMessage('Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
-            slWarnings.Add('Warning: ' + f + ' is not flagged as a cubemap, but has a 4:3 aspect ratio. The texture likely is bugged.');
-        end;
-    except
-        on E: Exception do begin
-            AddMessage('Error reading: ' + f + ' <' + E.Message + '>');
-            slWarnings.Add('Error reading: ' + f + ' <' + E.Message + '>');
         end;
     finally
         dds.Free;
