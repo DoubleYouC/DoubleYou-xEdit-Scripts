@@ -8,6 +8,7 @@ var
     joWinningCells, joInteriors: TJsonObject;
     xtelRefs: TList;
     slCellsWithSky: TStringList;
+    xccmPatchFile: IwbFile;
 
 // Called before processing
 // You can remove it if script doesn't require initialization code
@@ -130,6 +131,9 @@ var
 begin
     for i := 0 to Pred(xtelRefs.Count) do begin
         ref := ObjectToElement(xtelRefs[i]);
+        weatherRegionOriginal := nil;
+        weatherRegion := nil;
+        cellRecordId := '';
 
 
         xtelLinkedRef := WinningOverride(LinksTo(ElementByPath(ref, 'XTEL\Door')));
@@ -139,6 +143,7 @@ begin
         if Signature(rCell) <> 'CELL' then continue;
         if (GetElementNativeValues(rCell, 'DATA - Flags\Is Interior Cell') = 0) then continue;
         if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
+        if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
 
         //AddMessage('Processing XTEL reference: ' + Name(ref));
         if ElementExists(rCell, 'XCCM') then begin
@@ -193,17 +198,23 @@ var
     bSkip: boolean;
     a, i, r, idx, count, countHere, totalChanged, totalChecked: integer;
     cellRecordId, originalWeatherRegion, correctedWeatherRegion, weatherRegionHere: string;
-    rCell: IwbElement;
+    rCell, rCellOverride, newWeatherRegion: IwbElement;
 begin
     totalChanged := 0;
     totalChecked := 0;
     for i := 0 to Pred(joInteriors.Count) do begin
-        Inc(totalChecked);
+        originalWeatherRegion := '';
+        correctedWeatherRegion := '';
+        weatherRegionHere := '';
+        countHere := 0;
         bSkip := False;
+
+        Inc(totalChecked);
+
         cellRecordId := joInteriors.Names[i];
         idx := slCellsWithSky.IndexOf(cellRecordId);
         if idx > -1 then slCellsWithSky.Delete(idx);
-        rCell := GetRecordFromFormIdFileId(cellRecordId);
+        rCell := WinningOverride(GetRecordFromFormIdFileId(cellRecordId));
         originalWeatherRegion := joInteriors.O[cellRecordId].S['OriginalWeatherRegion'];
 
         //Skip if the cell already has the correct weather region assigned to it.
@@ -226,10 +237,36 @@ begin
                 count := countHere;
             end;
         end;
+        if not Assigned(correctedWeatherRegion) then begin
+            AddMessage('Could not locate the weather region for this interior: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
+            if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
+            AddMessage(#9#9 + 'XTEL references:');
+            for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
+                AddMessage(#9#9#9 + joInteriors.O[cellRecordId].A['XTELReferences'].S[a]);
+                AddMessage(#9#9#9 + 'In cell: ' + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[a])));
+            end;
+            continue;
+        end;
+
         Inc(totalChanged);
         AddMessage('Cell: ' + Name(rCell));
-        AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
-        AddMessage(#9 + 'Corrected weather region: ' + Name(GetRecordFromFormIdFileId(correctedWeatherRegion)));
+        if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
+        newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
+        AddMessage(#9 + 'Corrected weather region: ' + Name(newWeatherRegion));
+        AddMessage(#9#9 + 'XTEL references:');
+        for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
+            AddMessage(#9#9#9 + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferences'].S[a])));
+            AddMessage(#9#9#9 + 'In cell: ' + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[a])));
+        end;
+
+        if not Assigned(xccmPatchFile) then begin
+            xccmPatchFile := AddNewFile;
+            AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
+        end;
+        AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
+        SortMasters(xccmPatchFile);
+        rCellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
+        SetElementEditValues(rCellOverride, 'XCCM', IntToHex(GetLoadOrderFormID(newWeatherRegion), 8));
     end;
     AddMessage('Total interiors checked: ' + IntToStr(totalChecked));
     AddMessage('Total interiors with mismatched weather region: ' + IntToStr(totalChanged));
