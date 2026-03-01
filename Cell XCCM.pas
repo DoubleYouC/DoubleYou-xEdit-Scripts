@@ -9,6 +9,8 @@ var
     xtelRefs, tlWeatherRegions: TList;
     slCellsWithSky: TStringList;
     xccmPatchFile: IwbFile;
+const
+    typesToAttenuate = 'Thunder,Precipitation';
 
 // Called before processing
 // You can remove it if script doesn't require initialization code
@@ -275,6 +277,7 @@ begin
         rCellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
         SetElementEditValues(rCellOverride, 'XCCM', IntToHex(GetLoadOrderFormID(newWeatherRegion), 8));
         SetElementEditValues(rCellOverride, 'DATA - Flags\Show Sky', 1);
+        tlWeatherRegions.Add(newWeatherRegion);
     end;
     AddMessage('Total interiors checked: ' + IntToStr(totalChecked));
     AddMessage('Total interiors with mismatched weather region: ' + IntToStr(totalChanged));
@@ -294,27 +297,27 @@ var
     weatherRegion, regionDataEntries, regionDataEntry, weatherTypes, weatherType, weatherHere,
     weatherSounds, weatherSound, weatherSoundRecord, intExtSound, weatherOverride: IwbElement;
     slWeatherRecordIds: TStringList;
-const
-    typesToAttenuate = 'Thunder,Precipitation';
 begin
+    AddMessage('Processing weather regions for interior cells...');
     slWeatherRecordIds := TStringList.Create;
     slWeatherRecordIds.Sorted := True;
     slWeatherRecordIds.Duplicates := dupIgnore;
     try
         for i := 0 to Pred(tlWeatherRegions.Count) do begin
-            weatherRegion := ObjectToElement(tlWeatherRegions[i]);
+            weatherRegion := WinningOverride(ObjectToElement(tlWeatherRegions[i]));
+            AddMessage('Processing weather region: ' + Name(weatherRegion));
             regionDataEntries := ElementByName(weatherRegion, 'Region Data Entries');
             for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
                 regionDataEntry := ElementByIndex(regionDataEntries, e);
                 if GetElementEditValues(regionDataEntry, 'RDAT\Type') = 'Weather' then begin
-                    weatherTypes := ElementByPath(regionDataEntry, 'RDWT\Weather Types');
+                    weatherTypes := ElementByPath(regionDataEntry, 'RDWT - Weather Types');
                     for j := 0 to Pred(ElementCount(weatherTypes)) do begin
                         weatherType := ElementByIndex(weatherTypes, j);
                         weatherHere := LinksTo(ElementByIndex(weatherType, 0));
                         if Assigned(weatherHere) then begin
                             weatherRecordId := RecordFormIdFileId(weatherHere);
                             slWeatherRecordIds.Add(weatherRecordId);
-                            //AddMessage('Found weather: ' + Name(weatherHere));
+                            AddMessage('Found weather: ' + Name(weatherHere));
                         end;
                     end;
                 end;
@@ -329,17 +332,19 @@ begin
             for e := 0 to Pred(ElementCount(weatherSounds)) do begin
                 weatherSound := ElementByIndex(weatherSounds, e);
                 weatherSoundType := GetElementEditValues(weatherSound, 'Type');
-                if Pos(weatherSoundType, typesToAttenuate) = 0 then continue;
+                //if Pos(weatherSoundType, typesToAttenuate) = 0 then continue;
                 weatherSoundRecord := WinningOverride(LinksTo(ElementByIndex(weatherSound, 0)));
-                if not Assigned(weatherSoundRecord) then continue;
-                intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
-                if not Assigned(intExtSound) then continue;
-                if not Assigned(weatherOverride) then begin
-                    AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
-                    SortMasters(xccmPatchFile);
-                    weatherOverride := wbCopyElementToFile(weatherHere, xccmPatchFile, False, True);
+                if ContainsText(EditorID(weatherSoundRecord), 'rain') or ContainsText(EditorID(weatherSoundRecord), 'thunder') then begin
+                    if not Assigned(weatherSoundRecord) then continue;
+                    intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
+                    if not Assigned(intExtSound) then continue;
+                    if not Assigned(weatherOverride) then begin
+                        AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
+                        SortMasters(xccmPatchFile);
+                        weatherOverride := wbCopyElementToFile(weatherHere, xccmPatchFile, False, True);
+                    end;
+                    SetElementEditValues(weatherOverride, 'Sounds\SNAM - Sound #' + IntToStr(e) + '\Sound', IntToHex(GetLoadOrderFormID(intExtSound), 8));
                 end;
-                SetElementEditValues(weatherOverride, 'Sounds\SNAM - Sound #' + IntToStr(e) + '\Sound', IntToHex(GetLoadOrderFormID(intExtSound), 8));
             end;
         end;
 
@@ -365,33 +370,36 @@ begin
         Exit;
     end;
     if SoundAlreadyHasInteriorConditionCheck(soundRecord) then Exit;
+    if SameText(GetElementEditValues(soundRecord, 'CNAM'), 'Compound') then begin
+        Exit; //not implemented yet
+    end else begin
+        AddRequiredElementMasters(soundRecord, xccmPatchFile, False, True);
+        SortMasters(xccmPatchFile);
 
-    AddRequiredElementMasters(soundRecord, xccmPatchFile, False, True);
-    SortMasters(xccmPatchFile);
+        //Add condition to original sound to not play in interiors
+        extSound := wbCopyElementToFile(soundRecord, xccmPatchFile, False, True);
+        AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject');
+        currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
 
-    //Add condition to original sound to not play in interiors
-    extSound := wbCopyElementToFile(soundRecord, xccmPatchFile, False, True);
-    AddCondition(extSound, 'Equal To', 'IsInInterior', '0.0', 'Subject');
-    currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
+        //Duplicate sound and attenuate for interiors
+        intSound := wbCopyElementToFile(soundRecord, xccmPatchFile, True, True);
+        SetEditorID(intSound, edid + '_Interior');
+        AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject');
+        //Increase attenuation by 20db for interiors
+        SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
 
-    //Duplicate sound and attenuate for interiors
-    intSound := wbCopyElementToFile(soundRecord, xccmPatchFile, True, True);
-    SetEditorID(intSound, edid + '_Interior');
-    AddCondition(intSound, 'Equal To', 'IsInInterior', '1.0', 'Subject');
-    //Increase attenuation by 20db for interiors
-    SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', currentAttenuation + 20);
-
-    //create compound sound to play the correct sound based on interior/exterior conditions
-    soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
-    compoundSound := Add(soundGroup, 'Compound Sound', True);
-    SetEditorID(compoundSound, edid + '_Compound');
-    SetElementEditValues(compoundSound, 'CNAM', 'Compound');
-    descriptors := Add(compoundSound, 'Descriptors', True);
-    descriptor := ElementAssign(descriptors, HighInteger, nil, False);
-    SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(extSound), 8));
-    descriptor := ElementAssign(descriptors, HighInteger, nil, False);
-    SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
-    joSounds.O[edid + '_Compound'].S['compound'] := RecordFormIdFileId(compoundSound);
+        //create compound sound to play the correct sound based on interior/exterior conditions
+        soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
+        compoundSound := Add(soundGroup, 'SNDR', True);
+        SetEditorID(compoundSound, edid + '_Compound');
+        SetElementEditValues(compoundSound, 'CNAM', 'Compound');
+        descriptors := Add(compoundSound, 'Descriptors', True);
+        descriptor := ElementByIndex(descriptors, 0);
+        SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(extSound), 8));
+        descriptor := ElementAssign(descriptors, HighInteger, nil, False);
+        SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
+        joSounds.O[edid + '_Compound'].S['compound'] := RecordFormIdFileId(compoundSound);
+    end;
 
     Result := compoundSound;
 end;
