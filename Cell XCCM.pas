@@ -5,7 +5,7 @@
 unit xccm;
 
 var
-    joWinningCells, joInteriors, joSounds: TJsonObject;
+    joWinningCells, joInteriors, joSounds, joImageSpaces: TJsonObject;
     xtelRefs, tlWeatherRegions: TList;
     slCellsWithSky: TStringList;
     xccmPatchFile: IwbFile;
@@ -16,17 +16,28 @@ const
 // You can remove it if script doesn't require initialization code
 function Initialize: integer;
 begin
-    joWinningCells := TJsonObject.Create;
-    joInteriors := TJsonObject.Create;
-    joSounds := TJsonObject.Create;
-    xtelRefs := TList.Create;
-    slCellsWithSky := TStringList.Create;
-    tlWeatherRegions := TList.Create;
+    try
+        joWinningCells := TJsonObject.Create;
+        joInteriors := TJsonObject.Create;
+        joSounds := TJsonObject.Create;
+        joImageSpaces := TJsonObject.Create;
+        xtelRefs := TList.Create;
+        slCellsWithSky := TStringList.Create;
+        tlWeatherRegions := TList.Create;
 
-    CollectRecords;
-    ProcessXTELRefs;
-    ProcessInteriors;
-    ProcessWeatherRegions;
+        CollectRecords;
+        ProcessXTELRefs;
+        ProcessInteriors;
+        ProcessWeatherRegions;
+    finally
+        joWinningCells.Free;
+        joInteriors.Free;
+        joSounds.Free;
+        joImageSpaces.Free;
+        xtelRefs.Free;
+        tlWeatherRegions.Free;
+        slCellsWithSky.Free;
+    end;
     Result := 0;
 end;
 
@@ -34,12 +45,6 @@ end;
 // You can remove it if script doesn't require finalization code
 function Finalize: integer;
 begin
-    joWinningCells.Free;
-    joInteriors.Free;
-    joSounds.Free;
-    xtelRefs.Free;
-    tlWeatherRegions.Free;
-    slCellsWithSky.Free;
     Result := 0;
 end;
 
@@ -149,8 +154,8 @@ begin
         if not Assigned(rCell) then continue;
         if Signature(rCell) <> 'CELL' then continue;
         if (GetElementNativeValues(rCell, 'DATA - Flags\Is Interior Cell') = 0) then continue;
-        if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
-        if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
+        //if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
+        //if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
 
         //AddMessage('Processing XTEL reference: ' + Name(ref));
         if ElementExists(rCell, 'XCCM') then begin
@@ -167,7 +172,7 @@ begin
         c := wbPositionToGridCell(position);
         cellRecordId := joWinningCells.O[wrldEdid].O[c.X].O[c.Y].S['RecordID'];
         //AddMessage('XTEL reference is in cell: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
-        weatherRegion := FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId);
+        weatherRegion := FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId, c.X, c.Y);
         // if Assigned(weatherRegion) then begin
         //     //AddMessage('Found weather region: ' + Name(weatherRegion));
         // end;
@@ -202,10 +207,11 @@ procedure ProcessInteriors;
     Process collected interiors;
 }
 var
-    bSkip: boolean;
+    bSkip, bWeatherRegionHasPrecipitation: boolean;
     a, i, r, idx, count, countHere, totalChanged, totalChecked: integer;
-    cellRecordId, originalWeatherRegion, correctedWeatherRegion, weatherRegionHere: string;
-    rCell, rCellOverride, newWeatherRegion: IwbElement;
+    cellRecordId, originalWeatherRegion, correctedWeatherRegion, weatherRegionHere,
+    xcimEditorID: string;
+    rCell, rCellOverride, newWeatherRegion, xcim: IwbElement;
 begin
     totalChanged := 0;
     totalChecked := 0;
@@ -215,6 +221,7 @@ begin
         weatherRegionHere := '';
         countHere := 0;
         bSkip := False;
+        bWeatherRegionHasPrecipitation := True;
 
         Inc(totalChecked);
 
@@ -244,23 +251,45 @@ begin
                 count := countHere;
             end;
         end;
-        if not Assigned(correctedWeatherRegion) then begin
-            AddMessage('Could not locate the weather region for this interior: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
-            if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
-            AddMessage(#9#9 + 'XTEL references:');
-            for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
-                AddMessage(#9#9#9 + joInteriors.O[cellRecordId].A['XTELReferences'].S[a]);
-                AddMessage(#9#9#9 + 'In cell: ' + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[a])));
-            end;
-            continue;
-        end;
+        // if not Assigned(correctedWeatherRegion) then begin
+        //     AddMessage('Could not locate the weather region for this interior: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
+        //     if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
+        //     AddMessage(#9#9 + 'XTEL references:');
+        //     for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
+        //         AddMessage(#9#9#9 + joInteriors.O[cellRecordId].A['XTELReferences'].S[a]);
+        //         AddMessage(#9#9#9 + 'In cell: ' + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[a])));
+        //     end;
+        //     continue;
+        // end;
 
+
+        if SameText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlightRegioninvertWarm') then
+            newWeatherRegion := nil; //Skip this region?
+        if Assigned(correctedWeatherRegion) then begin
+            newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
+            bWeatherRegionHasPrecipitation := DoesWeatherRegionHavePrecipitation(newWeatherRegion);
+        end else newWeatherRegion := nil;
+
+
+        if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then begin
+            if bWeatherRegionHasPrecipitation then begin
+                //This cell has a weather region with precipitation but is using sky lighting, so we will not change the weather region for this cell since it can cause rain in interiors.
+                AddMessage('Cell has a corrected weather region with precipitation but is using sky lighting. Skipping weather region assignment for this cell: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
+                if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
+                AddMessage(#9#9 + 'XTEL references:');
+                for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
+                    AddMessage(#9#9#9 + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferences'].S[a])));
+                    AddMessage(#9#9#9 + 'In cell: ' + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[a])));
+                end;
+                continue;
+            end else AddMessage('Cell is using sky lighting but the corrected weather region does not have precipitation, so it is safe to assign the corrected weather region for this cell.');
+        end;
         Inc(totalChanged);
-        newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
-        //if SameText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlightRegioninvertWarm') then continue; //Skip this region?
         AddMessage('Cell: ' + Name(rCell));
         if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
-        AddMessage(#9 + 'Corrected weather region: ' + Name(newWeatherRegion));
+        if Assigned(newWeatherRegion) then
+            AddMessage(#9 + 'Corrected weather region: ' + Name(newWeatherRegion))
+        else AddMessage(#9 + 'Corrected weather region: NONE');
         AddMessage(#9#9 + 'XTEL references:');
         for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
             AddMessage(#9#9#9 + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferences'].S[a])));
@@ -275,9 +304,17 @@ begin
         AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
         SortMasters(xccmPatchFile);
         rCellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
-        SetElementEditValues(rCellOverride, 'XCCM', IntToHex(GetLoadOrderFormID(newWeatherRegion), 8));
+        if Assigned(newWeatherRegion) then begin
+            SetElementEditValues(rCellOverride, 'XCCM', IntToHex(GetLoadOrderFormID(newWeatherRegion), 8));
+            tlWeatherRegions.Add(newWeatherRegion);
+        end
+        else if ElementExists(rCellOverride, 'XCCM') then RemoveElement(rCellOverride, 'XCCM');
+        if (GetElementNativeValues(rCellOverride, 'DATA - Flags\Show Sky') <> 0) then continue;
         SetElementEditValues(rCellOverride, 'DATA - Flags\Show Sky', 1);
-        tlWeatherRegions.Add(newWeatherRegion);
+        //Since we are adding show sky flag, we need to check the imagespaces.
+        xcim := WinningOverride(LinksTo(ElementByPath(rCellOverride, 'XCIM')));
+        if not Assigned(xcim) then continue;
+        SetElementEditValues(rCellOverride, 'XCIM', overrideImagespace(xcim));
     end;
     AddMessage('Total interiors checked: ' + IntToStr(totalChecked));
     AddMessage('Total interiors with mismatched weather region: ' + IntToStr(totalChanged));
@@ -285,6 +322,66 @@ begin
         cellRecordId := slCellsWithSky[i];
         AddMessage('Cell not checked for weather region: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
     end;
+end;
+
+function overrideImagespace(xcim: IwbElement): string;
+{
+    Returns the load order formid of the imagespace that will be used.
+}
+var
+    xcimEditorID: string;
+    skyScale: double;
+    xcimOverride: IwbElement;
+begin
+    Result := IntToHex(GetLoadOrderFormID(xcim), 8);
+    xcimEditorID := GetElementEditValues(xcim, 'EDID');
+    if joImageSpaces.O[xcimEditorID].S['override'] <> '' then begin
+        Result := joImageSpaces.O[xcimEditorID].S['override'];
+        Exit;
+    end;
+    skyScale := GetElementNativeValues(xcim, 'HNAM\Sky Scale');
+    if (skyScale > 1.0) then begin
+        //This imagespace has a sky scale that is greater than 1, so we will create an override with the sky scale reduced to 1.
+        AddRequiredElementMasters(xcim, xccmPatchFile, False, True);
+        SortMasters(xccmPatchFile);
+        xcimOverride := wbCopyElementToFile(xcim, xccmPatchFile, True, True);
+        SetEditorID(xcimOverride, xcimEditorID + '_Sky');
+        SetElementEditValues(xcimOverride, 'HNAM\Sky Scale', '1.0');
+        Result := IntToHex(GetLoadOrderFormID(xcimOverride), 8);
+        joImageSpaces.O[xcimEditorID].S['override'] := Result;
+    end;
+end;
+
+function DoesWeatherRegionHavePrecipitation(weatherRegion: IwbElement): boolean;
+{
+    Checks if the given weather region has precipitation.
+}
+var
+    regionDataEntries, regionDataEntry, weatherTypes, weatherType, weatherHere: IwbElement;
+    e, j: integer;
+begin
+    regionDataEntries := ElementByName(weatherRegion, 'Region Data Entries');
+    for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
+        regionDataEntry := ElementByIndex(regionDataEntries, e);
+        if GetElementEditValues(regionDataEntry, 'RDAT\Type') = 'Weather' then begin
+            weatherTypes := ElementByPath(regionDataEntry, 'RDWT - Weather Types');
+            for j := 0 to Pred(ElementCount(weatherTypes)) do begin
+                weatherType := ElementByIndex(weatherTypes, j);
+                weatherHere := LinksTo(ElementByIndex(weatherType, 0));
+                if Assigned(weatherHere) then begin
+                    if (GetElementNativeValues(weatherHere, 'DATA\Flags\Weather - Rainy') <> 0) then begin
+                        Result := True;
+                        Exit;
+                    end;
+                    if (GetElementNativeValues(weatherHere, 'DATA\Flags\Weather - Snowy') <> 0) then begin
+                        Result := True;
+                        Exit;
+                    end;
+                end;
+            end;
+        end;
+    end;
+    Result := False;
 end;
 
 procedure ProcessWeatherRegions;
@@ -494,7 +591,7 @@ begin
 end;
 
 
-function FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId: string): IwbElement;
+function FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId: string; x, y: integer): IwbElement;
 {
     Finds the weather region for the given cell.
 }
