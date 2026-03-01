@@ -396,6 +396,9 @@ begin
             AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject');
             //Increase attenuation by 20db for interiors
             SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
+            //set output model to have increased reverb for interiors.
+            if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
+                SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
 
             if not Assigned(compoundSound) then begin
                 //copy the pre-existing compound sound to the patch file and add the new sound to its descriptors
@@ -425,6 +428,9 @@ begin
         AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject');
         //Increase attenuation by 20db for interiors
         SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
+        //set output model to have increased reverb for interiors.
+        if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
+            SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
 
         //create compound sound to play the correct sound based on interior/exterior conditions
         soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
