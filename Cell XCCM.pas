@@ -293,7 +293,7 @@ procedure ProcessWeatherRegions;
 }
 var
     i, e, j: integer;
-    weatherRecordId, weatherSoundType: string;
+    weatherRecordId, weatherSoundType, weatherSoundRecordEditorID: string;
     weatherRegion, regionDataEntries, regionDataEntry, weatherTypes, weatherType, weatherHere,
     weatherSounds, weatherSound, weatherSoundRecord, intExtSound, weatherOverride: IwbElement;
     slWeatherRecordIds: TStringList;
@@ -325,6 +325,7 @@ begin
         end;
 
         for i := 0 to Pred(slWeatherRecordIds.Count) do begin
+            AddMessage('Processing weather record: ' + slWeatherRecordIds[i]);
             weatherOverride := nil;
             weatherRecordId := slWeatherRecordIds[i];
             weatherHere := WinningOverride(GetRecordFromFormIdFileId(weatherRecordId));
@@ -334,10 +335,12 @@ begin
                 weatherSoundType := GetElementEditValues(weatherSound, 'Type');
                 //if Pos(weatherSoundType, typesToAttenuate) = 0 then continue;
                 weatherSoundRecord := WinningOverride(LinksTo(ElementByIndex(weatherSound, 0)));
-                if ContainsText(EditorID(weatherSoundRecord), 'rain') or ContainsText(EditorID(weatherSoundRecord), 'thunder') then begin
+                weatherSoundRecordEditorID := GetElementEditValues(weatherSoundRecord, 'EDID');
+                if (ContainsText(weatherSoundRecordEditorID, 'rain') or ContainsText(weatherSoundRecordEditorID, 'thunder')) then begin
                     if not Assigned(weatherSoundRecord) then continue;
                     intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
                     if not Assigned(intExtSound) then continue;
+                    if SameText(RecordFormIdFileId(intExtSound), RecordFormIdFileId(weatherSoundRecord)) then continue; //No changes made to this sound, skip it.
                     if not Assigned(weatherOverride) then begin
                         AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
                         SortMasters(xccmPatchFile);
@@ -358,8 +361,10 @@ function MakeAttenuatedCompoundSound(soundRecord: IwbElement): IwbElement;
     Creates a new sound record with attenuated interior sound levels based on the given sound record.
 }
 var
-    compoundSound, intSound, extSound, conditions, descriptors, descriptor: IwbElement;
+    compoundSound, intSound, extSound, conditions, descriptors, descriptor,
+    soundHere, descriptorsNew: IwbElement;
     soundGroup: IwbGroupRecord;
+    i: integer;
     edid: string;
     currentAttenuation: double;
 begin
@@ -371,7 +376,40 @@ begin
     end;
     if SoundAlreadyHasInteriorConditionCheck(soundRecord) then Exit;
     if SameText(GetElementEditValues(soundRecord, 'CNAM'), 'Compound') then begin
-        Exit; //not implemented yet
+        descriptors := ElementByName(soundRecord, 'Descriptors');
+        for i := 0 to Pred(ElementCount(descriptors)) do begin
+            soundHere := WinningOverride(LinksTo(ElementByIndex(descriptors, i)));
+            AddMessage('Processing sound descriptor: ' + Name(soundHere));
+            if SoundAlreadyHasInteriorConditionCheck(soundHere) then continue;
+
+            AddRequiredElementMasters(soundHere, xccmPatchFile, False, True);
+            SortMasters(xccmPatchFile);
+
+            //Add condition to original sound to not play in interiors
+            extSound := wbCopyElementToFile(soundHere, xccmPatchFile, False, True);
+            AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject');
+            currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
+
+            //Duplicate sound and attenuate for interiors
+            intSound := wbCopyElementToFile(soundHere, xccmPatchFile, True, True);
+            SetEditorID(intSound, edid + '_Interior');
+            AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject');
+            //Increase attenuation by 20db for interiors
+            SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
+
+            if not Assigned(compoundSound) then begin
+                //copy the pre-existing compound sound to the patch file and add the new sound to its descriptors
+                AddRequiredElementMasters(soundHere, xccmPatchFile, False, True);
+                SortMasters(xccmPatchFile);
+
+                compoundSound := wbCopyElementToFile(soundRecord, xccmPatchFile, False, True);
+                descriptorsNew := ElementByName(compoundSound, 'Descriptors');
+            end;
+
+            //Add the duplicated sound to the compound sound's descriptors
+            descriptor := ElementAssign(descriptorsNew, HighInteger, nil, False);
+            SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
+        end;
     end else begin
         AddRequiredElementMasters(soundRecord, xccmPatchFile, False, True);
         SortMasters(xccmPatchFile);
