@@ -5,8 +5,8 @@
 unit xccm;
 
 var
-    joWinningCells, joInteriors: TJsonObject;
-    xtelRefs: TList;
+    joWinningCells, joInteriors, joSounds: TJsonObject;
+    xtelRefs, tlWeatherRegions: TList;
     slCellsWithSky: TStringList;
     xccmPatchFile: IwbFile;
 
@@ -16,12 +16,15 @@ function Initialize: integer;
 begin
     joWinningCells := TJsonObject.Create;
     joInteriors := TJsonObject.Create;
+    joSounds := TJsonObject.Create;
     xtelRefs := TList.Create;
     slCellsWithSky := TStringList.Create;
+    tlWeatherRegions := TList.Create;
 
     CollectRecords;
     ProcessXTELRefs;
     ProcessInteriors;
+    ProcessWeatherRegions;
     Result := 0;
 end;
 
@@ -31,7 +34,9 @@ function Finalize: integer;
 begin
     joWinningCells.Free;
     joInteriors.Free;
+    joSounds.Free;
     xtelRefs.Free;
+    tlWeatherRegions.Free;
     slCellsWithSky.Free;
     Result := 0;
 end;
@@ -249,9 +254,10 @@ begin
         end;
 
         Inc(totalChanged);
+        newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
+        //if SameText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlightRegioninvertWarm') then continue; //Skip this region?
         AddMessage('Cell: ' + Name(rCell));
         if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
-        newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
         AddMessage(#9 + 'Corrected weather region: ' + Name(newWeatherRegion));
         AddMessage(#9#9 + 'XTEL references:');
         for a := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferences'].Count) do begin
@@ -263,10 +269,12 @@ begin
             xccmPatchFile := AddNewFile;
             AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
         end;
+
         AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
         SortMasters(xccmPatchFile);
         rCellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
         SetElementEditValues(rCellOverride, 'XCCM', IntToHex(GetLoadOrderFormID(newWeatherRegion), 8));
+        SetElementEditValues(rCellOverride, 'DATA - Flags\Show Sky', 1);
     end;
     AddMessage('Total interiors checked: ' + IntToStr(totalChecked));
     AddMessage('Total interiors with mismatched weather region: ' + IntToStr(totalChanged));
@@ -275,6 +283,164 @@ begin
         AddMessage('Cell not checked for weather region: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
     end;
 end;
+
+procedure ProcessWeatherRegions;
+{
+    Process collected weather regions;
+}
+var
+    i, e, j: integer;
+    weatherRecordId, weatherSoundType: string;
+    weatherRegion, regionDataEntries, regionDataEntry, weatherTypes, weatherType, weatherHere,
+    weatherSounds, weatherSound, weatherSoundRecord, intExtSound, weatherOverride: IwbElement;
+    slWeatherRecordIds: TStringList;
+const
+    typesToAttenuate = 'Thunder,Precipitation';
+begin
+    slWeatherRecordIds := TStringList.Create;
+    slWeatherRecordIds.Sorted := True;
+    slWeatherRecordIds.Duplicates := dupIgnore;
+    try
+        for i := 0 to Pred(tlWeatherRegions.Count) do begin
+            weatherRegion := ObjectToElement(tlWeatherRegions[i]);
+            regionDataEntries := ElementByName(weatherRegion, 'Region Data Entries');
+            for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
+                regionDataEntry := ElementByIndex(regionDataEntries, e);
+                if GetElementEditValues(regionDataEntry, 'RDAT\Type') = 'Weather' then begin
+                    weatherTypes := ElementByPath(regionDataEntry, 'RDWT\Weather Types');
+                    for j := 0 to Pred(ElementCount(weatherTypes)) do begin
+                        weatherType := ElementByIndex(weatherTypes, j);
+                        weatherHere := LinksTo(ElementByIndex(weatherType, 0));
+                        if Assigned(weatherHere) then begin
+                            weatherRecordId := RecordFormIdFileId(weatherHere);
+                            slWeatherRecordIds.Add(weatherRecordId);
+                            //AddMessage('Found weather: ' + Name(weatherHere));
+                        end;
+                    end;
+                end;
+            end;
+        end;
+
+        for i := 0 to Pred(slWeatherRecordIds.Count) do begin
+            weatherOverride := nil;
+            weatherRecordId := slWeatherRecordIds[i];
+            weatherHere := WinningOverride(GetRecordFromFormIdFileId(weatherRecordId));
+            weatherSounds := ElementByName(weatherHere, 'Sounds');
+            for e := 0 to Pred(ElementCount(weatherSounds)) do begin
+                weatherSound := ElementByIndex(weatherSounds, e);
+                weatherSoundType := GetElementEditValues(weatherSound, 'Type');
+                if Pos(weatherSoundType, typesToAttenuate) = 0 then continue;
+                weatherSoundRecord := WinningOverride(LinksTo(ElementByIndex(weatherSound, 0)));
+                if not Assigned(weatherSoundRecord) then continue;
+                intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
+                if not Assigned(intExtSound) then continue;
+                if not Assigned(weatherOverride) then begin
+                    AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
+                    SortMasters(xccmPatchFile);
+                    weatherOverride := wbCopyElementToFile(weatherHere, xccmPatchFile, False, True);
+                end;
+                SetElementEditValues(weatherOverride, 'Sounds\SNAM - Sound #' + IntToStr(e) + '\Sound', IntToHex(GetLoadOrderFormID(intExtSound), 8));
+            end;
+        end;
+
+    finally
+        slWeatherRecordIds.Free;
+    end;
+end;
+
+function MakeAttenuatedCompoundSound(soundRecord: IwbElement): IwbElement;
+{
+    Creates a new sound record with attenuated interior sound levels based on the given sound record.
+}
+var
+    compoundSound, intSound, extSound, conditions, descriptors, descriptor: IwbElement;
+    soundGroup: IwbGroupRecord;
+    edid: string;
+    currentAttenuation: double;
+begin
+    Result := nil;
+    edid := GetElementEditValues(soundRecord, 'EDID');
+    if joSounds.O[edid + '_Compound'].S['compound'] <> '' then begin
+        Result := GetRecordFromFormIdFileId(joSounds.O[edid + '_Compound'].S['compound']);
+        Exit;
+    end;
+    if SoundAlreadyHasInteriorConditionCheck(soundRecord) then Exit;
+
+    AddRequiredElementMasters(soundRecord, xccmPatchFile, False, True);
+    SortMasters(xccmPatchFile);
+
+    //Add condition to original sound to not play in interiors
+    extSound := wbCopyElementToFile(soundRecord, xccmPatchFile, False, True);
+    AddCondition(extSound, 'Equal To', 'IsInInterior', '0.0', 'Subject');
+    currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
+
+    //Duplicate sound and attenuate for interiors
+    intSound := wbCopyElementToFile(soundRecord, xccmPatchFile, True, True);
+    SetEditorID(intSound, edid + '_Interior');
+    AddCondition(intSound, 'Equal To', 'IsInInterior', '1.0', 'Subject');
+    //Increase attenuation by 20db for interiors
+    SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', currentAttenuation + 20);
+
+    //create compound sound to play the correct sound based on interior/exterior conditions
+    soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
+    compoundSound := Add(soundGroup, 'Compound Sound', True);
+    SetEditorID(compoundSound, edid + '_Compound');
+    SetElementEditValues(compoundSound, 'CNAM', 'Compound');
+    descriptors := Add(compoundSound, 'Descriptors', True);
+    descriptor := ElementAssign(descriptors, HighInteger, nil, False);
+    SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(extSound), 8));
+    descriptor := ElementAssign(descriptors, HighInteger, nil, False);
+    SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
+    joSounds.O[edid + '_Compound'].S['compound'] := RecordFormIdFileId(compoundSound);
+
+    Result := compoundSound;
+end;
+
+function SoundAlreadyHasInteriorConditionCheck(soundRecord: IwbElement): boolean;
+{
+    Checks if the given sound record has an interior condition check.
+}
+var
+    conditions: IwbElement;
+    i: integer;
+begin
+    conditions := ElementByName(soundRecord, 'Conditions');
+    for i := 0 to Pred(ElementCount(conditions)) do begin
+        if GetElementEditValues(ElementByIndex(conditions, i), 'CTDA\Function') = 'IsInInterior' then begin
+            Result := True;
+            Exit;
+        end;
+    end;
+    Result := False;
+end;
+
+procedure AddCondition(e: IwbElement; conditionType, conditionFunction, conditionValue, conditionRunOn: string);
+{
+  Add a condition to the given element.
+}
+var
+    i: integer;
+
+    el, conditions, condition: IwbElement;
+begin
+    if not ElementExists(e, 'Conditions') then begin
+        conditions := Add(e, 'Conditions', True);
+        condition := ElementByIndex(conditions, 0);
+        SetElementEditValues(condition, 'CTDA\Type', conditionType);
+        SetElementEditValues(condition, 'CTDA\Function', conditionFunction);
+        SetElementEditValues(condition, 'CTDA\Comparison Value - Float', conditionValue);
+        SetElementEditValues(condition, 'CTDA\Run On', conditionRunOn);
+    end
+    else begin
+        conditions := ElementByPath(e, 'Conditions');
+        condition := ElementAssign(conditions, HighInteger, nil, False);
+        SetElementEditValues(condition, 'CTDA\Type', conditionType);
+        SetElementEditValues(condition, 'CTDA\Function', conditionFunction);
+        SetElementEditValues(condition, 'CTDA\Comparison Value - Float', conditionValue);
+        SetElementEditValues(condition, 'CTDA\Run On', conditionRunOn);
+    end;
+end;
+
 
 function FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId: string): IwbElement;
 {
