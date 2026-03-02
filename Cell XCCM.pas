@@ -110,12 +110,14 @@ begin
                     subblock := ElementByIndex(block, subblockidx);
                     for cellidx := 0 to Pred(ElementCount(subblock)) do begin
                         rCell := ElementByIndex(subblock, cellidx);
+                        if not IsWinningOverride(rCell) then continue;
                         if (Signature(rCell) <> 'CELL') then continue;
                         if not GetIsPersistent(rCell) then begin
                             cellX := GetElementNativeValues(rCell, 'XCLC\X');
                             cellY := GetElementNativeValues(rCell, 'XCLC\Y');
                             //AddMessage('Found cell: ' + Name(rCell) + ' at ' + cellX + ',' + cellY);
                             joWinningCells.O[wrldEdid].O[cellX].O[cellY].S['RecordID'] := RecordFormIdFileId(rCell);
+                            VerifyWeatherRegionsForCell(rCell);
                         end;
                         //if count > 10 then break;
                     end;
@@ -263,12 +265,14 @@ begin
         // end;
 
 
-        if SameText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlightRegioninvertWarm') then
-            newWeatherRegion := nil; //Skip this region?
+
         if Assigned(correctedWeatherRegion) then begin
             newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
             bWeatherRegionHasPrecipitation := DoesWeatherRegionHavePrecipitation(newWeatherRegion);
         end else newWeatherRegion := nil;
+        if ContainsText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlight') then begin
+            newWeatherRegion := nil; //Skip this region?
+        end;
 
 
         if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then begin
@@ -402,7 +406,7 @@ begin
     try
         for i := 0 to Pred(tlWeatherRegions.Count) do begin
             weatherRegion := WinningOverride(ObjectToElement(tlWeatherRegions[i]));
-            AddMessage('Processing weather region: ' + Name(weatherRegion));
+            //AddMessage('Processing weather region: ' + Name(weatherRegion));
             regionDataEntries := ElementByName(weatherRegion, 'Region Data Entries');
             for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
                 regionDataEntry := ElementByIndex(regionDataEntries, e);
@@ -414,7 +418,7 @@ begin
                         if Assigned(weatherHere) then begin
                             weatherRecordId := RecordFormIdFileId(weatherHere);
                             slWeatherRecordIds.Add(weatherRecordId);
-                            AddMessage('Found weather: ' + Name(weatherHere));
+                            //AddMessage('Found weather: ' + Name(weatherHere));
                         end;
                     end;
                 end;
@@ -422,7 +426,7 @@ begin
         end;
 
         for i := 0 to Pred(slWeatherRecordIds.Count) do begin
-            AddMessage('Processing weather record: ' + slWeatherRecordIds[i]);
+            //AddMessage('Processing weather record: ' + slWeatherRecordIds[i]);
             weatherOverride := nil;
             weatherRecordId := slWeatherRecordIds[i];
             weatherHere := WinningOverride(GetRecordFromFormIdFileId(weatherRecordId));
@@ -433,18 +437,18 @@ begin
                 //if Pos(weatherSoundType, typesToAttenuate) = 0 then continue;
                 weatherSoundRecord := WinningOverride(LinksTo(ElementByIndex(weatherSound, 0)));
                 weatherSoundRecordEditorID := GetElementEditValues(weatherSoundRecord, 'EDID');
-                if (ContainsText(weatherSoundRecordEditorID, 'rain') or ContainsText(weatherSoundRecordEditorID, 'thunder')) then begin
-                    if not Assigned(weatherSoundRecord) then continue;
-                    intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
-                    if not Assigned(intExtSound) then continue;
-                    if SameText(RecordFormIdFileId(intExtSound), RecordFormIdFileId(weatherSoundRecord)) then continue; //No changes made to this sound, skip it.
-                    if not Assigned(weatherOverride) then begin
-                        AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
-                        SortMasters(xccmPatchFile);
-                        weatherOverride := wbCopyElementToFile(weatherHere, xccmPatchFile, False, True);
-                    end;
-                    SetElementEditValues(weatherOverride, 'Sounds\SNAM - Sound #' + IntToStr(e) + '\Sound', IntToHex(GetLoadOrderFormID(intExtSound), 8));
+                // if (ContainsText(weatherSoundRecordEditorID, 'rain') or ContainsText(weatherSoundRecordEditorID, 'thunder')) then begin
+                if not Assigned(weatherSoundRecord) then continue;
+                intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
+                if not Assigned(intExtSound) then continue;
+                if SameText(RecordFormIdFileId(intExtSound), RecordFormIdFileId(weatherSoundRecord)) then continue; //No changes made to this sound, skip it.
+                if not Assigned(weatherOverride) then begin
+                    AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
+                    SortMasters(xccmPatchFile);
+                    weatherOverride := wbCopyElementToFile(weatherHere, xccmPatchFile, False, True);
                 end;
+                SetElementEditValues(weatherOverride, 'Sounds\SNAM - Sound #' + IntToStr(e) + '\Sound', IntToHex(GetLoadOrderFormID(intExtSound), 8));
+                // end;
             end;
         end;
 
@@ -590,6 +594,94 @@ begin
     end;
 end;
 
+procedure VerifyWeatherRegionsForCell(rCell: IwbElement);
+{
+    Verifies that the weather regions for the given cell are correct and patches as necessary.
+}
+var
+    bFoundWeatherRegion, bHasOverride: boolean;
+    i, e, priority, priorityHere, priorityOverride, priorityOverrideHere, previousIndex: integer;
+    regionEditorID: string;
+    xclr, region, regionDataEntries, regionDataEntry, weatherRegion, rWrld, cellOverride: IwbElement;
+    slRegionsToRemove: TStringList;
+begin
+    slRegionsToRemove := TStringList.Create;
+    try
+        bFoundWeatherRegion := False;
+        bHasOverride := False;
+        priority := 0;
+        priorityOverride := 0;
+        priorityOverrideHere := 0;
+        previousIndex := -1;
+        xclr := ElementByPath(rCell, 'XCLR');
+
+        //iterate over regions for the cell
+        for i := 0 to Pred(ElementCount(xclr)) do begin
+            //new region
+            region := WinningOverride(LinksTo(ElementByIndex(xclr, i)));
+            regionEditorID := GetElementEditValues(region, 'EDID');
+            if ContainsText(regionEditorID, 'FXlight') then slRegionsToRemove.Add(i); //Mark FXlight regions for removal since they are incorrect.
+            // This part is not implemented, because I don't want to invent problems that might not exist.
+            // regionDataEntries := ElementByName(region, 'Region Data Entries');
+            // for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
+            //     regionDataEntry := ElementByIndex(regionDataEntries, e);
+            //     if GetElementEditValues(regionDataEntry, 'RDAT\Type') = 'Weather' then begin
+            //         bFoundWeatherRegion := True;
+            //         if GetElementEditValues(regionDataEntry, 'RDAT\Override') = 'False' then begin
+            //             bHasOverride := True;
+            //             priorityOverrideHere := GetElementNativeValues(regionDataEntry, 'RDAT\Priority');
+            //             if priorityOverrideHere > priorityOverride then begin
+            //                 if (priorityOverride <> 0) and (previousIndex <> -1) then begin
+            //                     //There should only be one Override = False weather region. If there is more than one, we will keep the one with the highest priority and remove the others.
+            //                     slRegionsToRemove.Add(previousIndex);
+            //                 end;
+            //                 priorityOverride := priorityOverrideHere;
+            //                 previousIndex := i;
+            //                 //weatherRegion := region;
+            //             end else if (priorityOverride <> 0) and (previousIndex <> -1) then begin
+            //                 //There should only be one Override = False weather region. If there is more than one, we will keep the one with the highest priority and remove the others.
+            //                 slRegionsToRemove.Add(i);
+            //             end;
+            //         // end
+            //         // else if not bHasOverride then begin
+            //         //     priorityHere := GetElementNativeValues(regionDataEntry, 'RDAT\Priority');
+            //         //     if priorityHere > priority then begin
+            //         //         priority := priorityHere;
+            //         //         //weatherRegion := region;
+            //         //     end;
+            //         end;
+            //     end;
+            // end;
+        end;
+
+        if slRegionsToRemove.Count > 0 then begin
+            rWrld := WinningOverride(LinksTo(ElementByIndex(rCell, 0)));
+
+            if not ContainsText(EditorID(rWrld), 'DiamondCityFX') then begin
+                AddMessage('Found ' + IntToStr(slRegionsToRemove.Count) + ' regions to remove for cell: ' + Name(rCell));
+
+                if not Assigned(xccmPatchFile) then begin
+                    xccmPatchFile := AddNewFile;
+                    AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
+                end;
+                AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
+                AddRequiredElementMasters(rWrld, xccmPatchFile, False, True);
+                SortMasters(xccmPatchFile);
+
+                wbCopyElementToFile(rWrld, xccmPatchFile, False, True);
+                cellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
+
+                xclr := ElementByPath(cellOverride, 'XCLR');
+                for i := Pred(slRegionsToRemove.Count) downto 0 do begin
+                    RemoveElement(xclr, ElementByIndex(xclr, slRegionsToRemove[i]));
+                end;
+            end;
+        end;
+    finally
+        slRegionsToRemove.Free;
+    end;
+
+end;
 
 function FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId: string; x, y: integer): IwbElement;
 {
@@ -623,23 +715,35 @@ function FindWeatherRegionForCell(rCell: IwbElement): IwbElement;
 }
 var
     bFoundWeatherRegion, bHasOverride: boolean;
-    i, e, priority, priorityHere: integer;
+    i, e, priority, priorityHere, priorityOverride, priorityOverrideHere: integer;
+    regionEditorID: string;
     xclr, region, regionDataEntries, regionDataEntry, weatherRegion: IwbElement;
 begin
     bFoundWeatherRegion := False;
     bHasOverride := False;
     priority := 0;
+    priorityOverride := 0;
+    priorityOverrideHere := 0;
     xclr := ElementByPath(rCell, 'XCLR');
+
+    //iterate over regions for the cell
     for i := 0 to Pred(ElementCount(xclr)) do begin
-        region := LinksTo(ElementByIndex(xclr, i));
+        //new region
+        region := WinningOverride(LinksTo(ElementByIndex(xclr, i)));
+        regionEditorID := GetElementEditValues(region, 'EDID');
+        if ContainsText(regionEditorID, 'FXlight') then continue; //Skip FXlight regions
         regionDataEntries := ElementByName(region, 'Region Data Entries');
         for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
             regionDataEntry := ElementByIndex(regionDataEntries, e);
             if GetElementEditValues(regionDataEntry, 'RDAT\Type') = 'Weather' then begin
                 bFoundWeatherRegion := True;
                 if GetElementEditValues(regionDataEntry, 'RDAT\Override') = 'False' then begin
-                    weatherRegion := region;
                     bHasOverride := True;
+                    priorityOverrideHere := GetElementNativeValues(regionDataEntry, 'RDAT\Priority');
+                    if priorityOverrideHere > priorityOverride then begin
+                        priorityOverride := priorityOverrideHere;
+                        weatherRegion := region;
+                    end;
                 end
                 else if not bHasOverride then begin
                     priorityHere := GetElementNativeValues(regionDataEntry, 'RDAT\Priority');
