@@ -9,6 +9,8 @@ var
     xtelRefs, tlWeatherRegions: TList;
     slCellsWithSky: TStringList;
     xccmPatchFile: IwbFile;
+    exteriorWeatherSoundCategory, interiorWeatherSoundCategory: IwbElement;
+    exteriorWeatherSoundCategoryFormId, interiorWeatherSoundCategoryFormId: string;
 const
     typesToAttenuate = 'Thunder,Precipitation';
 
@@ -46,6 +48,21 @@ end;
 function Finalize: integer;
 begin
     Result := 0;
+end;
+
+function AddRefToPatch(ref: IwbElement): IwbElement;
+{
+    Adds a reference to the patch file and returns the new reference element.
+}
+var
+    n: IwbElement;
+begin
+    AddRequiredElementMasters(ref, xccmPatchFile, False, True);
+    SortMasters(xccmPatchFile);
+    n := wbCopyElementToFile(ref, xccmPatchFile, False, True);
+    SetFormVCS1(n, GetFormVCS1(ref));
+    SetFormVCS2(n, GetFormVCS2(ref));
+    Result := n;
 end;
 
 procedure CollectRecords;
@@ -270,7 +287,8 @@ begin
             newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
             bWeatherRegionHasPrecipitation := DoesWeatherRegionHavePrecipitation(newWeatherRegion);
         end else newWeatherRegion := nil;
-        if ContainsText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlight') then begin
+        if ContainsText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlight') or
+        ContainsText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXDiamondSky') then begin
             newWeatherRegion := nil; //Skip this region?
         end;
 
@@ -288,6 +306,7 @@ begin
                 continue;
             end else AddMessage('Cell is using sky lighting but the corrected weather region does not have precipitation, so it is safe to assign the corrected weather region for this cell.');
         end;
+        if SameText(originalWeatherRegion, 'NONE') and not Assigned(newWeatherRegion) then continue; //No original weather region and no corrected weather region, so skip this cell since there is no mismatch.
         Inc(totalChanged);
         AddMessage('Cell: ' + Name(rCell));
         if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
@@ -305,9 +324,7 @@ begin
             AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
         end;
 
-        AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
-        SortMasters(xccmPatchFile);
-        rCellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
+        rCellOverride := AddRefToPatch(rCell);
         if Assigned(newWeatherRegion) then begin
             SetElementEditValues(rCellOverride, 'XCCM', IntToHex(GetLoadOrderFormID(newWeatherRegion), 8));
             tlWeatherRegions.Add(newWeatherRegion);
@@ -463,7 +480,7 @@ function MakeAttenuatedCompoundSound(soundRecord: IwbElement): IwbElement;
 }
 var
     compoundSound, intSound, extSound, conditions, descriptors, descriptor,
-    soundHere, descriptorsNew: IwbElement;
+    soundHere, descriptorsNew, gnam: IwbElement;
     soundGroup: IwbGroupRecord;
     i: integer;
     edid: string;
@@ -477,6 +494,7 @@ begin
     end;
     if SoundAlreadyHasInteriorConditionCheck(soundRecord) then Exit;
     if SameText(GetElementEditValues(soundRecord, 'CNAM'), 'Compound') then begin
+        //Compound sound descriptors
         descriptors := ElementByName(soundRecord, 'Descriptors');
         for i := 0 to Pred(ElementCount(descriptors)) do begin
             soundHere := WinningOverride(LinksTo(ElementByIndex(descriptors, i)));
@@ -486,10 +504,13 @@ begin
             AddRequiredElementMasters(soundHere, xccmPatchFile, False, True);
             SortMasters(xccmPatchFile);
 
+            if not Assigned(interiorWeatherSoundCategory) then CreateWeatherSoundCategories;
+
             //Add condition to original sound to not play in interiors
             extSound := wbCopyElementToFile(soundHere, xccmPatchFile, False, True);
             AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject');
             currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
+            SetElementEditValues(extSound, 'GNAM', exteriorWeatherSoundCategoryFormId);
 
             //Duplicate sound and attenuate for interiors
             intSound := wbCopyElementToFile(soundHere, xccmPatchFile, True, True);
@@ -500,6 +521,7 @@ begin
             //set output model to have increased reverb for interiors.
             if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
                 SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
+            SetElementEditValues(intSound, 'GNAM', interiorWeatherSoundCategoryFormId);
 
             if not Assigned(compoundSound) then begin
                 //copy the pre-existing compound sound to the patch file and add the new sound to its descriptors
@@ -515,13 +537,19 @@ begin
             SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
         end;
     end else begin
+        //Normal sound descriptors
         AddRequiredElementMasters(soundRecord, xccmPatchFile, False, True);
         SortMasters(xccmPatchFile);
+
+        if not Assigned(interiorWeatherSoundCategory) then CreateWeatherSoundCategories;
 
         //Add condition to original sound to not play in interiors
         extSound := wbCopyElementToFile(soundRecord, xccmPatchFile, False, True);
         AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject');
         currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
+        gnam := ElementByPath(extSound, 'GNAM');
+
+
 
         //Duplicate sound and attenuate for interiors
         intSound := wbCopyElementToFile(soundRecord, xccmPatchFile, True, True);
@@ -532,6 +560,7 @@ begin
         //set output model to have increased reverb for interiors.
         if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
             SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
+        SetElementEditValues(intSound, 'GNAM', interiorWeatherSoundCategoryFormId);
 
         //create compound sound to play the correct sound based on interior/exterior conditions
         soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
@@ -543,10 +572,46 @@ begin
         SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(extSound), 8));
         descriptor := ElementAssign(descriptors, HighInteger, nil, False);
         SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
+        ElementAssign(Add(compoundSound, 'GNAM', True), 0, gnam, False);
+
+        SetElementEditValues(extSound, 'GNAM', exteriorWeatherSoundCategoryFormId);
+
         joSounds.O[edid + '_Compound'].S['compound'] := RecordFormIdFileId(compoundSound);
     end;
 
     Result := compoundSound;
+end;
+
+procedure CreateWeatherSoundCategories;
+{
+    Creates the sound categories needed for the weather sounds.
+}
+var
+    snctGroup: IwbGroupRecord;
+begin
+    snctGroup := Add(xccmPatchFile, 'SNCT', True);
+
+    exteriorWeatherSoundCategory := Add(snctGroup, 'SNCT', True);
+    SetEditorID(exteriorWeatherSoundCategory, 'AudioCategoryExteriorWeather_XCCM');
+    SetElementEditValues(exteriorWeatherSoundCategory, 'FULL', 'Exterior Weather Sounds');
+    SetElementEditValues(exteriorWeatherSoundCategory, 'PNAM', 'EB803'); //Set Master as parent
+    SetElementEditValues(exteriorWeatherSoundCategory, 'FNAM\Should Appear on Menu', '1');
+    SetElementEditValues(exteriorWeatherSoundCategory, 'FNAM\Mute When Submerged', '1');
+    SetElementEditValues(exteriorWeatherSoundCategory, 'VNAM', '1.0');
+    SetElementEditValues(exteriorWeatherSoundCategory, 'UNAM', '1.0');
+    SetElementEditValues(exteriorWeatherSoundCategory, 'MNAM', '1.0');
+    exteriorWeatherSoundCategoryFormId := IntToHex(GetLoadOrderFormID(exteriorWeatherSoundCategory), 8);
+
+    interiorWeatherSoundCategory := Add(snctGroup, 'SNCT', True);
+    SetEditorID(interiorWeatherSoundCategory, 'AudioCategoryInteriorWeather_XCCM');
+    SetElementEditValues(interiorWeatherSoundCategory, 'FULL', 'Interior Weather Sounds');
+    SetElementEditValues(interiorWeatherSoundCategory, 'PNAM', 'EB803'); //Set Master as parent
+    SetElementEditValues(interiorWeatherSoundCategory, 'FNAM\Should Appear on Menu', '1');
+    SetElementEditValues(interiorWeatherSoundCategory, 'FNAM\Mute When Submerged', '1');
+    SetElementEditValues(interiorWeatherSoundCategory, 'VNAM', '1.0');
+    SetElementEditValues(interiorWeatherSoundCategory, 'UNAM', '1.0');
+    SetElementEditValues(interiorWeatherSoundCategory, 'MNAM', '1.0');
+    interiorWeatherSoundCategoryFormId := IntToHex(GetLoadOrderFormID(interiorWeatherSoundCategory), 8);
 end;
 
 function SoundAlreadyHasInteriorConditionCheck(soundRecord: IwbElement): boolean;
@@ -556,12 +621,17 @@ function SoundAlreadyHasInteriorConditionCheck(soundRecord: IwbElement): boolean
 var
     conditions: IwbElement;
     i: integer;
+    gnamRecordId: string;
 begin
     conditions := ElementByName(soundRecord, 'Conditions');
     for i := 0 to Pred(ElementCount(conditions)) do begin
         if GetElementEditValues(ElementByIndex(conditions, i), 'CTDA\Function') = 'IsInInterior' then begin
-            Result := True;
-            Exit;
+            gnamRecordId := RecordFormIdFileId(LinksTo(ElementByPath(soundRecord, 'GNAM')));
+            if SameText(gnamRecordId, RecordFormIdFileId(interiorWeatherSoundCategory))
+            or SameText(gnamRecordId, RecordFormIdFileId(exteriorWeatherSoundCategory)) then begin
+                Result := True;
+                Exit;
+            end;
         end;
     end;
     Result := False;
@@ -585,8 +655,15 @@ begin
         SetElementEditValues(condition, 'CTDA\Run On', conditionRunOn);
     end
     else begin
+        //Check if the condition already exists before adding a new one
         conditions := ElementByPath(e, 'Conditions');
-        condition := ElementAssign(conditions, HighInteger, nil, False);
+        for i := 0 to Pred(ElementCount(conditions)) do begin
+            if GetElementEditValues(ElementByIndex(conditions, i), 'CTDA\Function') = conditionFunction then begin
+                condition := ElementByIndex(conditions, i);
+            end;
+        end;
+        if not Assigned(condition) then
+            condition := ElementAssign(conditions, HighInteger, nil, False);
         SetElementEditValues(condition, 'CTDA\Type', conditionType);
         SetElementEditValues(condition, 'CTDA\Function', conditionFunction);
         SetElementEditValues(condition, 'CTDA\Comparison Value - Float', conditionValue);
@@ -621,7 +698,7 @@ begin
             region := WinningOverride(LinksTo(ElementByIndex(xclr, i)));
             regionEditorID := GetElementEditValues(region, 'EDID');
             if ContainsText(regionEditorID, 'FXlight') then slRegionsToRemove.Add(i); //Mark FXlight regions for removal since they are incorrect.
-            // This part is not implemented, because I don't want to invent problems that might not exist.
+            //if SameText(regionEditorID, 'NoGlow') then slRegionsToRemove.Add(i);
             // regionDataEntries := ElementByName(region, 'Region Data Entries');
             // for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
             //     regionDataEntry := ElementByIndex(regionDataEntries, e);
@@ -633,14 +710,17 @@ begin
             //             if priorityOverrideHere > priorityOverride then begin
             //                 if (priorityOverride <> 0) and (previousIndex <> -1) then begin
             //                     //There should only be one Override = False weather region. If there is more than one, we will keep the one with the highest priority and remove the others.
-            //                     slRegionsToRemove.Add(previousIndex);
+            //                     //slRegionsToRemove.Add(previousIndex);
+            //                     slOverrideRegions.Add(i);
+            //                     slOverrideRegions.Add(previousIndex);
             //                 end;
             //                 priorityOverride := priorityOverrideHere;
             //                 previousIndex := i;
             //                 //weatherRegion := region;
             //             end else if (priorityOverride <> 0) and (previousIndex <> -1) then begin
             //                 //There should only be one Override = False weather region. If there is more than one, we will keep the one with the highest priority and remove the others.
-            //                 slRegionsToRemove.Add(i);
+            //                 //slRegionsToRemove.Add(i);
+            //                 slOverrideRegions.Add(i);
             //             end;
             //         // end
             //         // else if not bHasOverride then begin
@@ -658,18 +738,14 @@ begin
             rWrld := WinningOverride(LinksTo(ElementByIndex(rCell, 0)));
 
             if not ContainsText(EditorID(rWrld), 'DiamondCityFX') then begin
-                AddMessage('Found ' + IntToStr(slRegionsToRemove.Count) + ' regions to remove for cell: ' + Name(rCell));
+                AddMessage('Found ' + IntToStr(slRegionsToRemove.Count) + ' region(s) to remove for cell: ' + Name(rCell));
 
                 if not Assigned(xccmPatchFile) then begin
                     xccmPatchFile := AddNewFile;
                     AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
                 end;
-                AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
-                AddRequiredElementMasters(rWrld, xccmPatchFile, False, True);
-                SortMasters(xccmPatchFile);
-
-                wbCopyElementToFile(rWrld, xccmPatchFile, False, True);
-                cellOverride := wbCopyElementToFile(rCell, xccmPatchFile, False, True);
+                AddRefToPatch(rWrld);
+                cellOverride := AddRefToPatch(rCell);
 
                 xclr := ElementByPath(cellOverride, 'XCLR');
                 for i := Pred(slRegionsToRemove.Count) downto 0 do begin
