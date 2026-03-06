@@ -5,7 +5,7 @@
 unit xccm;
 
 var
-    joWinningCells, joInteriors, joSounds, joImageSpaces: TJsonObject;
+    joWinningCells, joInteriors, joSounds, joImageSpaces, joWeatherRegions, joWeathers: TJsonObject;
     xtelRefs, tlWeatherRegions: TList;
     slCellsWithSky: TStringList;
     xccmPatchFile: IwbFile;
@@ -23,6 +23,8 @@ begin
         joInteriors := TJsonObject.Create;
         joSounds := TJsonObject.Create;
         joImageSpaces := TJsonObject.Create;
+        joWeatherRegions := TJsonObject.Create;
+        joWeathers := TJsonObject.Create;
         xtelRefs := TList.Create;
         slCellsWithSky := TStringList.Create;
         tlWeatherRegions := TList.Create;
@@ -36,6 +38,8 @@ begin
         joInteriors.Free;
         joSounds.Free;
         joImageSpaces.Free;
+        joWeatherRegions.Free;
+        joWeathers.Free;
         xtelRefs.Free;
         tlWeatherRegions.Free;
         slCellsWithSky.Free;
@@ -227,10 +231,10 @@ procedure ProcessInteriors;
 }
 var
     bSkip, bWeatherRegionHasPrecipitation: boolean;
-    a, i, r, idx, count, countHere, totalChanged, totalChecked: integer;
+    a, i, r, c, idx, count, countHere, totalChanged, totalChecked: integer;
     cellRecordId, originalWeatherRegion, correctedWeatherRegion, weatherRegionHere,
     xcimEditorID: string;
-    rCell, rCellOverride, newWeatherRegion, xcim: IwbElement;
+    rCell, rCellOverride, newWeatherRegion, xcim, xtelCell, xtelCellOverride, rWrld: IwbElement;
 begin
     totalChanged := 0;
     totalChecked := 0;
@@ -284,7 +288,7 @@ begin
 
 
         if Assigned(correctedWeatherRegion) then begin
-            newWeatherRegion := GetRecordFromFormIdFileId(correctedWeatherRegion);
+            newWeatherRegion := WinningOverride(GetRecordFromFormIdFileId(correctedWeatherRegion));
             bWeatherRegionHasPrecipitation := DoesWeatherRegionHavePrecipitation(newWeatherRegion);
         end else newWeatherRegion := nil;
         if ContainsText(GetElementEditValues(newWeatherRegion, 'EDID'), 'FXlight') or
@@ -304,6 +308,17 @@ begin
                     AddMessage(#9#9#9 + 'In cell: ' + Name(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[a])));
                 end;
                 continue;
+                // newWeatherRegion := CreateReplacementWeatherRegion(newWeatherRegion);
+                // if not Assigned(newWeatherRegion) then continue;
+                // for c := 0 to Pred(joInteriors.O[cellRecordId].A['XTELReferenceCells'].Count) do begin
+                //     xtelCell := WinningOverride(GetRecordFromFormIdFileId(joInteriors.O[cellRecordId].A['XTELReferenceCells'].S[c]));
+                //     if not Assigned(xtelCell) then continue;
+                //     rWrld := WinningOverride(LinksTo(ElementByIndex(xtelCell, 0)));
+                //     AddRefToPatch(rWrld);
+                //     xtelCellOverride := AddRefToPatch(xtelCell);
+                //     ReplaceWeatherRegion(xtelCellOverride, newWeatherRegion);
+                //     tlWeatherRegions.Add(newWeatherRegion);
+                // end;
             end else AddMessage('Cell is using sky lighting but the corrected weather region does not have precipitation, so it is safe to assign the corrected weather region for this cell.');
         end;
         if SameText(originalWeatherRegion, 'NONE') and not Assigned(newWeatherRegion) then continue; //No original weather region and no corrected weather region, so skip this cell since there is no mismatch.
@@ -343,6 +358,34 @@ begin
         cellRecordId := slCellsWithSky[i];
         AddMessage('Cell not checked for weather region: ' + Name(GetRecordFromFormIdFileId(cellRecordId)));
     end;
+end;
+
+function CreateReplacementWeatherRegion(originalWeatherRegion: IwbElement): IwbElement;
+{
+    Creates a new weather region based on the original weather region but with precipitation removed from it.
+}
+var
+    weatherRegionNew, weatherTypes, weatherType, weatherHere, alreadyMadeRegion: IwbElement;
+    regnGroup: IwbGroupRecord;
+    i: integer;
+    edidWeatherRegion: string;
+begin
+    Result := nil;
+    if not Assigned(originalWeatherRegion) then Exit; //handle this later, for now just return nil if there is no original weather region.
+    edidWeatherRegion := GetElementEditValues(originalWeatherRegion, 'EDID');
+    regnGroup := GroupBySignature(xccmPatchFile, 'REGN');
+    alreadyMadeRegion := MainRecordByEditorID(regnGroup, edidWeatherRegion + '_XCCM');
+    if Assigned(alreadyMadeRegion) then begin
+        Result := alreadyMadeRegion;
+        Exit;
+    end;
+
+    AddRequiredElementMasters(originalWeatherRegion, xccmPatchFile, False, True);
+    SortMasters(xccmPatchFile);
+    weatherRegionNew := wbCopyElementToFile(originalWeatherRegion, xccmPatchFile, True, True);
+    SetEditorID(weatherRegionNew, edidWeatherRegion + '_XCCM');
+    RemovePrecipitationFromWeathersInRegion(weatherRegionNew);
+    Result := weatherRegionNew;
 end;
 
 function overrideImagespace(xcim: IwbElement): string;
@@ -388,13 +431,9 @@ begin
             weatherTypes := ElementByPath(regionDataEntry, 'RDWT - Weather Types');
             for j := 0 to Pred(ElementCount(weatherTypes)) do begin
                 weatherType := ElementByIndex(weatherTypes, j);
-                weatherHere := LinksTo(ElementByIndex(weatherType, 0));
+                weatherHere := WinningOverride(LinksTo(ElementByIndex(weatherType, 0)));
                 if Assigned(weatherHere) then begin
-                    if (GetElementNativeValues(weatherHere, 'DATA\Flags\Weather - Rainy') <> 0) then begin
-                        Result := True;
-                        Exit;
-                    end;
-                    if (GetElementNativeValues(weatherHere, 'DATA\Flags\Weather - Snowy') <> 0) then begin
+                    if ElementExists(weatherHere, 'MNAM') then begin
                         Result := True;
                         Exit;
                     end;
@@ -403,6 +442,110 @@ begin
         end;
     end;
     Result := False;
+end;
+
+procedure RemovePrecipitationFromWeathersInRegion(weatherRegion: IwbElement);
+{
+    Removes precipitation from all weathers in the given weather region.
+}
+var
+    regionDataEntries, regionDataEntry, weatherTypes, weatherType, weatherHere, newWeather: IwbElement;
+    e, j: integer;
+    newWeatherFormid: string;
+begin
+    regionDataEntries := ElementByName(weatherRegion, 'Region Data Entries');
+    for e := 0 to Pred(ElementCount(regionDataEntries)) do begin
+        regionDataEntry := ElementByIndex(regionDataEntries, e);
+        if GetElementEditValues(regionDataEntry, 'RDAT\Type') = 'Weather' then begin
+            weatherTypes := ElementByPath(regionDataEntry, 'RDWT - Weather Types');
+            for j := Pred(ElementCount(weatherTypes)) downto 0 do begin
+                weatherType := ElementByIndex(weatherTypes, j);
+                weatherHere := WinningOverride(LinksTo(ElementByIndex(weatherType, 0)));
+                if Assigned(weatherHere) then begin
+                    newWeather := FixWeather(weatherHere);
+                    if Assigned(newWeather) then begin
+                        newWeatherFormid := IntToHex(GetLoadOrderFormID(newWeather), 8);
+                        SetElementEditValues(weatherType, 'Weather', newWeatherFormid);
+                    end;
+                end;
+            end;
+        end;
+    end;
+end;
+
+function FixWeather(weather: IwbElement): IwbElement;
+{
+    Creates a new weather record based on the given weather record but with precipitation removed from it.
+}
+var
+    newWeatherHere, defaultInteriorWeather, alreadyMadeWeather, imagespaces, imgspc, imgspcNew: IwbElement;
+    edidWeather: string;
+    i: integer;
+    weatherGroup: IwbGroupRecord;
+begin
+    Result := nil;
+    if not Assigned(weather) then Exit;
+    edidWeather := GetElementEditValues(weather, 'EDID');
+    if ContainsText(edidWeather, '_XCCM') then begin
+        //This weather record has already been processed, so return it.
+        Result := weather;
+        Exit;
+    end;
+
+    weatherGroup := GroupBySignature(xccmPatchFile, 'WTHR');
+    alreadyMadeWeather := MainRecordByEditorID(weatherGroup, edidWeather + '_XCCM');
+    if Assigned(alreadyMadeWeather) then begin
+        Result := alreadyMadeWeather;
+        Exit;
+    end;
+
+    AddRequiredElementMasters(weather, xccmPatchFile, False, True);
+    SortMasters(xccmPatchFile);
+    newWeatherHere := wbCopyElementToFile(weather, xccmPatchFile, True, True);
+    SetEditorID(newWeatherHere, GetElementEditValues(weather, 'EDID') + '_XCCM');
+    SetElementEditValues(newWeatherHere, 'MNAM', '0');
+    SetElementEditValues(newWeatherHere, 'NNAM', '0002AE7A');
+
+    defaultInteriorWeather := WinningOverride(RecordByFormID(FileByIndex(0), $001A65F0, False));
+    ElementAssign(ElementByPath(newWeatherHere, 'FNAM'), LowInteger, ElementByPath(defaultInteriorWeather, 'FNAM'), False);
+    ElementAssign(ElementByPath(newWeatherHere, 'DATA'), LowInteger, ElementByPath(defaultInteriorWeather, 'DATA'), False);
+    ElementAssign(ElementByPath(newWeatherHere, 'UNAM'), LowInteger, ElementByPath(defaultInteriorWeather, 'UNAM'), False);
+    Remove(ElementByPath(newWeatherHere, 'Sounds'));
+    // imagespaces := ElementByPath(newWeatherHere, 'IMSP');
+    // for i := Pred(ElementCount(imagespaces)) downto 0 do begin
+    //     imgspc := WinningOverride(LinksTo(ElementByIndex(imagespaces, i)));
+    //     if not Assigned(imgspc) then continue;
+    //     SetEditValue(ElementByIndex(imagespaces, i), FixImagespace(imgspc));
+    // end;
+
+    Result := newWeatherHere;
+end;
+
+function FixImagespace(imsp: IwbElement): string;
+{
+    Returns the load order formid of the imagespace that will be used.
+}
+var
+    imspEditorID: string;
+    brightness: double;
+    imspOverride: IwbElement;
+begin
+    Result := IntToHex(GetLoadOrderFormID(imsp), 8);
+    imspEditorID := GetElementEditValues(imsp, 'EDID');
+    if joImageSpaces.O[imspEditorID].S['interior'] <> '' then begin
+        Result := joImageSpaces.O[imspEditorID].S['interior'];
+        Exit;
+    end;
+    brightness := GetElementNativeValues(imsp, 'HNAM\Middle Gray');
+    if (brightness < 0.18) then begin
+        AddRequiredElementMasters(imsp, xccmPatchFile, False, True);
+        SortMasters(xccmPatchFile);
+        imspOverride := wbCopyElementToFile(imsp, xccmPatchFile, True, True);
+        SetEditorID(imspOverride, imspEditorID + '_InteriorBrightness');
+        SetElementEditValues(imspOverride, 'HNAM\Middle Gray', '0.18');
+        Result := IntToHex(GetLoadOrderFormID(imspOverride), 8);
+        joImageSpaces.O[imspEditorID].S['interior'] := Result;
+    end;
 end;
 
 procedure ProcessWeatherRegions;
@@ -447,6 +590,8 @@ begin
             weatherOverride := nil;
             weatherRecordId := slWeatherRecordIds[i];
             weatherHere := WinningOverride(GetRecordFromFormIdFileId(weatherRecordId));
+            if SameText(GetFileName(GetFile(weatherHere)), GetFileName(xccmPatchFile)) then
+                weatherOverride := weatherHere;
             weatherSounds := ElementByName(weatherHere, 'Sounds');
             for e := 0 to Pred(ElementCount(weatherSounds)) do begin
                 weatherSound := ElementByIndex(weatherSounds, e);
@@ -758,6 +903,29 @@ begin
     end;
 
 end;
+
+procedure ReplaceWeatherRegion(xtelCell: IwbElement; newWeatherRegion: IwbElement);
+{
+    Replaces the weather region for the given cell with the new weather region.
+}
+var
+    weatherRegion, xclr: IwbElement;
+    i: integer;
+begin
+    weatherRegion := FindWeatherRegionForCell(xtelCell);
+    xclr := ElementByPath(xtelCell, 'XCLR');
+    if not Assigned(weatherRegion) then begin
+        ElementAssign(xclr, HighInteger, newWeatherRegion, False);
+    end else begin
+        for i := 0 to Pred(ElementCount(xclr)) do begin
+            if SameText(RecordFormIdFileId(LinksTo(ElementByIndex(xclr, i))), RecordFormIdFileId(weatherRegion)) then begin
+                ElementAssign(ElementByIndex(xclr, i), LowInteger, newWeatherRegion, False);
+                Break;
+            end;
+        end;
+    end;
+end;
+
 
 function FindWeatherRegionForWorldspaceCell(wrldEdid, cellRecordId: string; x, y: integer): IwbElement;
 {
