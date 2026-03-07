@@ -7,17 +7,23 @@ unit xccm;
 var
     joWinningCells, joInteriors, joSounds, joImageSpaces, joWeatherRegions, joWeathers: TJsonObject;
     xtelRefs, tlWeatherRegions: TList;
-    slCellsWithSky: TStringList;
+    slCellsWithSky, slCellsToBlockSound: TStringList;
     xccmPatchFile: IwbFile;
     exteriorWeatherSoundCategory, interiorWeatherSoundCategory: IwbElement;
     exteriorWeatherSoundCategoryFormId, interiorWeatherSoundCategoryFormId: string;
+    uiScale: integer;
+    bLightPlugin: boolean;
 const
     typesToAttenuate = 'Thunder,Precipitation';
 
 // Called before processing
 // You can remove it if script doesn't require initialization code
 function Initialize: integer;
+var
+    fs: TFileStream;
+    cmdline: string;
 begin
+    Result := 0;
     try
         joWinningCells := TJsonObject.Create;
         joInteriors := TJsonObject.Create;
@@ -27,12 +33,46 @@ begin
         joWeathers := TJsonObject.Create;
         xtelRefs := TList.Create;
         slCellsWithSky := TStringList.Create;
+        slCellsToBlockSound := TStringList.Create;
+        slCellsToBlockSound.Sorted := True;
+        slCellsToBlockSound.Duplicates := dupIgnore;
         tlWeatherRegions := TList.Create;
 
-        CollectRecords;
-        ProcessXTELRefs;
-        ProcessInteriors;
-        ProcessWeatherRegions;
+        bLightPlugin := True;
+
+        //Get scaling
+        uiScale := Screen.PixelsPerInch * 100 / 96;
+        AddMessage('UI scale: ' + IntToStr(uiScale));
+
+        if MainMenuForm then begin
+            CollectRecords;
+            ProcessXTELRefs;
+            ProcessInteriors;
+            ProcessWeatherRegions;
+
+            DeleteDirectory(wbScriptsPath + 'DISASTER\output');
+
+            EnsureDirectoryExists(wbScriptsPath + 'DISASTER\output\');
+            fs := TFileStream.Create(wbScriptsPath + 'DISASTER\output\DISASTER.esp', fmCreate);
+            try
+                FileWriteToStream(xccmPatchFile, fs, 0);
+            finally
+                fs.Free;
+            end;
+
+            //Zip up output for easy installation
+            AddMessage('Zipping up output for easy installation...');
+            cmdline := '-Command "Compress-Archive -Path (Get-ChildItem ''' + wbScriptsPath + 'DISASTER\output'').FullName -DestinationPath ''' + wbScriptsPath + 'DISASTER\output\DISASTER.zip''"';
+            AddMessage(cmdline);
+            AddMessage('Exit Code: ' + IntToStr(ShellExecuteWait(0, 'open', 'Powershell', cmdline, '', SW_SHOWNORMAL)));
+
+            //Open the output folder in Explorer
+            cmdline := '"'+ wbScriptsPath + 'DISASTER\output"';
+            ShellExecute(0, 'open', 'explorer', cmdline, '', SW_SHOWNORMAL);
+
+            MessageDlg('Patch generated successfully!' + #13#10#13#10 + 'Install the DISASTER.zip file in your mod manager.', mtInformation, [mbOk], 0);
+        end else Result := 1; //User cancelled
+
     finally
         joWinningCells.Free;
         joInteriors.Free;
@@ -43,8 +83,8 @@ begin
         xtelRefs.Free;
         tlWeatherRegions.Free;
         slCellsWithSky.Free;
+        slCellsToBlockSound.Free;
     end;
-    Result := 0;
 end;
 
 // Called after processing
@@ -52,6 +92,94 @@ end;
 function Finalize: integer;
 begin
     Result := 0;
+end;
+
+function MainMenuForm: Boolean;
+{
+    Main menu form.
+}
+var
+    frm: TForm;
+    btnStart, btnCancel: TButton;
+    gbOptions: TGroupBox;
+    pnl: TPanel;
+begin
+    Result := True;
+    Exit;
+    frm := TForm.Create(nil);
+    try
+        frm.Caption := 'Dynamic Interior Skies And Sounds Tied to Exterior Regions';
+        frm.Width := 400;
+        frm.Height := 200;
+        frm.Position := poMainFormCenter;
+        frm.BorderStyle := bsDialog;
+        frm.KeyPreview := True;
+        frm.OnClose := frmOptionsFormClose;
+        frm.OnKeyDown := FormKeyDown;
+
+        // gbOptions := TGroupBox.Create(frm);
+        // gbOptions.Parent := frm;
+        // gbOptions.Left := 6;
+        // gbOptions.Top := 16;
+        // gbOptions.Width := frm.Width - 30;
+        // gbOptions.Caption := 'DISASTER';
+        // gbOptions.Height := 254;
+
+        btnStart := TButton.Create(frm);
+        btnStart.Parent := frm;
+        btnStart.Caption := 'Start';
+        btnStart.ModalResult := mrOk;
+        //btnStart.Top := gbOptions.Top + gbOptions.Height + 24;
+        btnStart.Top := 16;
+
+        btnCancel := TButton.Create(frm);
+        btnCancel.Parent := frm;
+        btnCancel.Caption := 'Cancel';
+        btnCancel.ModalResult := mrCancel;
+        btnCancel.Top := btnStart.Top;
+
+        btnStart.Left := frm.Width - 30 - btnStart.Width - btnCancel.Width - 16;
+        btnCancel.Left := btnStart.Left + btnStart.Width + 8;
+
+        pnl := TPanel.Create(frm);
+        pnl.Parent := frm;
+        pnl.Left := 6;
+        pnl.Top := btnStart.Top - 12;
+        pnl.Width := frm.Width - 30;
+        pnl.Height := 2;
+
+        frm.ActiveControl := btnStart;
+        frm.ScaleBy(uiScale, 100);
+        frm.Font.Size := 8;
+        frm.Height := btnStart.Top + btnStart.Height + btnStart.Height + 30;
+
+        if frm.ShowModal <> mrOk then begin
+            Result := False;
+            Exit;
+        end
+        else Result := True;
+
+
+
+    finally
+        frm.Free;
+    end;
+end;
+
+procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+{
+    Cancel if Escape key is pressed.
+}
+begin
+    if Key = VK_ESCAPE then TForm(Sender).ModalResult := mrCancel;
+end;
+
+procedure frmOptionsFormClose(Sender: TObject; var Action: TCloseAction);
+{
+    Close form handler.
+}
+begin
+    if TForm(Sender).ModalResult <> mrOk then Exit
 end;
 
 function AddRefToPatch(ref: IwbElement): IwbElement;
@@ -80,6 +208,7 @@ var
     g, wrldgroup, refs: IwbGroupRecord;
     rWrld, block, subblock, rCell, ref: IwbElement;
 begin
+    AddMessage('Collecting cells and interiors...');
     count := 0;
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
@@ -158,7 +287,7 @@ procedure ProcessXTELRefs;
 }
 var
     i, count, withSky: integer;
-    wrldEdid, cellRecordId, acousticSpaceEdid, cellEdid: string;
+    wrldEdid, cellRecordId, acousticSpaceEdid, cellEdid, cellFormid: string;
     ref: IwbElement;
     position: TwbVector;
     c: TwbGridCell;
@@ -169,8 +298,7 @@ begin
         weatherRegionOriginal := nil;
         weatherRegion := nil;
         cellRecordId := '';
-
-
+        cellFormid := '';
         xtelLinkedRef := WinningOverride(LinksTo(ElementByPath(ref, 'XTEL\Door')));
         if not Assigned(xtelLinkedRef) then continue;
         rCell := WinningOverride(LinksTo(ElementByIndex(xtelLinkedRef, 0)));
@@ -179,13 +307,14 @@ begin
         if (GetElementNativeValues(rCell, 'DATA - Flags\Is Interior Cell') = 0) then continue;
         acousticSpace := WinningOverride(LinksTo(ElementByPath(rCell, 'XCAS')));
         acousticSpaceEdid := GetElementEditValues(acousticSpace, 'EDID');
+        cellFormid := IntToHex(GetLoadOrderFormID(rCell), 8);
         //Skip caves
-        if ContainsText(acousticSpaceEdid, 'IntCave') then continue;
+        if ContainsText(acousticSpaceEdid, 'IntCave') then slCellsToBlockSound.Add(cellFormid);
         //Skip Institute
-        if ContainsText(acousticSpaceEdid, 'IntInstitute') then continue;
-        if ContainsText(acousticSpaceEdid, 'IntNauticalA') then continue;
-        if ContainsText(acousticSpaceEdid, 'IntSubway') then continue;
-        if ContainsText(acousticSpaceEdid, 'IntVault') then continue;
+        if ContainsText(acousticSpaceEdid, 'IntInstitute') then slCellsToBlockSound.Add(cellFormid);
+        if ContainsText(acousticSpaceEdid, 'IntNauticalA') then slCellsToBlockSound.Add(cellFormid);
+        if ContainsText(acousticSpaceEdid, 'IntSubway') then slCellsToBlockSound.Add(cellFormid);
+        if ContainsText(acousticSpaceEdid, 'IntVault') then slCellsToBlockSound.Add(cellFormid);
         //if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
         //if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
 
@@ -344,7 +473,7 @@ begin
         end;
 
         if not Assigned(xccmPatchFile) then begin
-            xccmPatchFile := AddNewFile;
+            xccmPatchFile := AddNewFileName('DISASTER.esp', bLightPlugin);
             AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
         end;
 
@@ -636,7 +765,7 @@ var
     compoundSound, intSound, extSound, conditions, descriptors, descriptor,
     soundHere, descriptorsNew, gnam: IwbElement;
     soundGroup: IwbGroupRecord;
-    i: integer;
+    i, c: integer;
     edid: string;
     currentAttenuation: double;
 begin
@@ -662,20 +791,26 @@ begin
 
             //Add condition to original sound to not play in interiors
             extSound := wbCopyElementToFile(soundHere, xccmPatchFile, False, True);
-            AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject');
+            AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject', '00 00 00 00');
             currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
-            SetElementEditValues(extSound, 'GNAM', exteriorWeatherSoundCategoryFormId);
+            SetElementEditValues(extSound, 'NNAM', 'Exterior Weather Sound');
+            //SetElementEditValues(extSound, 'GNAM', exteriorWeatherSoundCategoryFormId);
 
             //Duplicate sound and attenuate for interiors
             intSound := wbCopyElementToFile(soundHere, xccmPatchFile, True, True);
             SetEditorID(intSound, edid + '_Interior');
-            AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject');
+            AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject', '00 00 00 00');
+            //Add conditions to remove cells
+            for c := 0 to Pred(slCellsToBlockSound.Count) do begin
+                AddCondition(intSound, '10000000', 'GetInCell', '0.0', 'Subject', slCellsToBlockSound[c]);
+            end;
             //Increase attenuation by 20db for interiors
             SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
             //set output model to have increased reverb for interiors.
             if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
                 SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
             SetElementEditValues(intSound, 'GNAM', interiorWeatherSoundCategoryFormId);
+            SetElementEditValues(intSound, 'NNAM', 'Interior Weather Sound');
 
             if not Assigned(compoundSound) then begin
                 //copy the pre-existing compound sound to the patch file and add the new sound to its descriptors
@@ -699,7 +834,7 @@ begin
 
         //Add condition to original sound to not play in interiors
         extSound := wbCopyElementToFile(soundRecord, xccmPatchFile, False, True);
-        AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject');
+        AddCondition(extSound, '10000000', 'IsInInterior', '0.0', 'Subject', '00 00 00 00');
         currentAttenuation := GetElementNativeValues(extSound, 'BNAM - Data\Values\Static Attenuation (db)');
         gnam := ElementByPath(extSound, 'GNAM');
 
@@ -708,13 +843,18 @@ begin
         //Duplicate sound and attenuate for interiors
         intSound := wbCopyElementToFile(soundRecord, xccmPatchFile, True, True);
         SetEditorID(intSound, edid + '_Interior');
-        AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject');
+        AddCondition(intSound, '10000000', 'IsInInterior', '1.0', 'Subject', '00 00 00 00');
+        //Add conditions to remove cells
+        for c := 0 to Pred(slCellsToBlockSound.Count) do begin
+            AddCondition(intSound, '10000000', 'GetInCell', '0.0', 'Subject', slCellsToBlockSound[c]);
+        end;
         //Increase attenuation by 20db for interiors
         SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
         //set output model to have increased reverb for interiors.
         if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
             SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
         SetElementEditValues(intSound, 'GNAM', interiorWeatherSoundCategoryFormId);
+        SetElementEditValues(intSound, 'NNAM', 'Interior Weather Sound');
 
         //create compound sound to play the correct sound based on interior/exterior conditions
         soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
@@ -728,7 +868,8 @@ begin
         SetEditValue(descriptor, IntToHex(GetLoadOrderFormID(intSound), 8));
         ElementAssign(Add(compoundSound, 'GNAM', True), 0, gnam, False);
 
-        SetElementEditValues(extSound, 'GNAM', exteriorWeatherSoundCategoryFormId);
+        SetElementEditValues(extSound, 'NNAM', 'Exterior Weather Sound');
+        //SetElementEditValues(extSound, 'GNAM', exteriorWeatherSoundCategoryFormId);
 
         joSounds.O[edid + '_Compound'].S['compound'] := RecordFormIdFileId(compoundSound);
     end;
@@ -745,16 +886,16 @@ var
 begin
     snctGroup := Add(xccmPatchFile, 'SNCT', True);
 
-    exteriorWeatherSoundCategory := Add(snctGroup, 'SNCT', True);
-    SetEditorID(exteriorWeatherSoundCategory, 'AudioCategoryExteriorWeather_XCCM');
-    SetElementEditValues(exteriorWeatherSoundCategory, 'FULL', 'Exterior Weather Sounds');
-    SetElementEditValues(exteriorWeatherSoundCategory, 'PNAM', 'EB803'); //Set Master as parent
-    SetElementEditValues(exteriorWeatherSoundCategory, 'FNAM\Should Appear on Menu', '1');
-    SetElementEditValues(exteriorWeatherSoundCategory, 'FNAM\Mute When Submerged', '1');
-    SetElementEditValues(exteriorWeatherSoundCategory, 'VNAM', '1.0');
-    SetElementEditValues(exteriorWeatherSoundCategory, 'UNAM', '1.0');
-    SetElementEditValues(exteriorWeatherSoundCategory, 'MNAM', '1.0');
-    exteriorWeatherSoundCategoryFormId := IntToHex(GetLoadOrderFormID(exteriorWeatherSoundCategory), 8);
+    // exteriorWeatherSoundCategory := Add(snctGroup, 'SNCT', True);
+    // SetEditorID(exteriorWeatherSoundCategory, 'AudioCategoryExteriorWeather_XCCM');
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'FULL', 'Exterior Weather Sounds');
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'PNAM', 'EB803'); //Set Master as parent
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'FNAM\Should Appear on Menu', '1');
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'FNAM\Mute When Submerged', '1');
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'VNAM', '1.0');
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'UNAM', '1.0');
+    // SetElementEditValues(exteriorWeatherSoundCategory, 'MNAM', '1.0');
+    // exteriorWeatherSoundCategoryFormId := IntToHex(GetLoadOrderFormID(exteriorWeatherSoundCategory), 8);
 
     interiorWeatherSoundCategory := Add(snctGroup, 'SNCT', True);
     SetEditorID(interiorWeatherSoundCategory, 'AudioCategoryInteriorWeather_XCCM');
@@ -780,9 +921,11 @@ begin
     conditions := ElementByName(soundRecord, 'Conditions');
     for i := 0 to Pred(ElementCount(conditions)) do begin
         if GetElementEditValues(ElementByIndex(conditions, i), 'CTDA\Function') = 'IsInInterior' then begin
-            gnamRecordId := RecordFormIdFileId(LinksTo(ElementByPath(soundRecord, 'GNAM')));
-            if SameText(gnamRecordId, RecordFormIdFileId(interiorWeatherSoundCategory))
-            or SameText(gnamRecordId, RecordFormIdFileId(exteriorWeatherSoundCategory)) then begin
+            // gnamRecordId := RecordFormIdFileId(LinksTo(ElementByPath(soundRecord, 'GNAM')));
+            // if SameText(gnamRecordId, RecordFormIdFileId(interiorWeatherSoundCategory))
+            // or SameText(gnamRecordId, RecordFormIdFileId(exteriorWeatherSoundCategory)) then begin
+            if SameText(GetElementEditValues(soundRecord, 'NNAM'), 'Exterior Weather Sound')
+            or SameText(GetElementEditValues(soundRecord, 'NNAM'), 'Interior Weather Sound') then begin
                 Result := True;
                 Exit;
             end;
@@ -791,7 +934,7 @@ begin
     Result := False;
 end;
 
-procedure AddCondition(e: IwbElement; conditionType, conditionFunction, conditionValue, conditionRunOn: string);
+procedure AddCondition(e: IwbElement; conditionType, conditionFunction, conditionValue, conditionRunOn, parameter1: string);
 {
   Add a condition to the given element.
 }
@@ -807,12 +950,14 @@ begin
         SetElementEditValues(condition, 'CTDA\Function', conditionFunction);
         SetElementEditValues(condition, 'CTDA\Comparison Value - Float', conditionValue);
         SetElementEditValues(condition, 'CTDA\Run On', conditionRunOn);
+        SetElementEditValues(condition, 'CTDA\Parameter #1', parameter1);
     end
     else begin
         //Check if the condition already exists before adding a new one
         conditions := ElementByPath(e, 'Conditions');
         for i := 0 to Pred(ElementCount(conditions)) do begin
-            if GetElementEditValues(ElementByIndex(conditions, i), 'CTDA\Function') = conditionFunction then begin
+            if SameText(GetElementEditValues(ElementByIndex(conditions, i), 'CTDA\Function'), conditionFunction)
+            and SameText('IsInInterior', conditionFunction) then begin
                 condition := ElementByIndex(conditions, i);
             end;
         end;
@@ -822,6 +967,7 @@ begin
         SetElementEditValues(condition, 'CTDA\Function', conditionFunction);
         SetElementEditValues(condition, 'CTDA\Comparison Value - Float', conditionValue);
         SetElementEditValues(condition, 'CTDA\Run On', conditionRunOn);
+        SetElementEditValues(condition, 'CTDA\Parameter #1', parameter1);
     end;
 end;
 
@@ -895,7 +1041,7 @@ begin
                 AddMessage('Found ' + IntToStr(slRegionsToRemove.Count) + ' region(s) to remove for cell: ' + Name(rCell));
 
                 if not Assigned(xccmPatchFile) then begin
-                    xccmPatchFile := AddNewFile;
+                    xccmPatchFile := AddNewFileName('DISASTER.esp', bLightPlugin);
                     AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
                 end;
                 AddRefToPatch(rWrld);
@@ -1032,6 +1178,56 @@ begin
     recordFormId := StrToInt('$' + Copy(recordId, 1, Pred(colonPos)));
     f := FileByName(Copy(recordId, Succ(colonPos), Length(recordId)));
     Result := RecordByFormID(f, recordFormId, False);
+end;
+
+function DeleteDirectory(dir: string): boolean;
+{
+    Deletes a directory and all files and subdirectories in it. Returns true if successful.
+}
+var
+    srFind : TSearchRec;
+    f: string;
+begin
+    Result := True;
+    if not DirectoryExists(dir) then Exit;
+
+    if FindFirst(dir + '\*', faAnyFile, srFind) = 0 then begin
+        repeat
+            if ((srFind.Name <> '.') and (srFind.Name <> '..')) then begin
+                f := dir + '\' + srFind.Name;
+
+                if ((srFind.attr and faDirectory) = faDirectory) then begin
+                    if (not DeleteDirectory(f)) then begin
+                        Result := False;
+                        Exit;
+                    end;
+                end
+                else begin
+                    if (not DeleteFile(f)) then begin
+                        Result := False;
+                        Exit;
+                    end;
+                end;
+            end;
+        until FindNext(srFind) <> 0;
+
+        FindClose(srFind);
+    end;
+
+    if (not RemoveDir(dir)) then begin
+        Result := False;
+        Exit;
+    end;
+end;
+
+procedure EnsureDirectoryExists(f: string);
+{
+    Create directories if they do not exist.
+}
+begin
+    if not DirectoryExists(f) then
+        if not ForceDirectories(f) then
+            raise Exception.Create('Can not create destination directory ' + f);
 end;
 
 end.
