@@ -158,11 +158,11 @@ procedure ProcessXTELRefs;
 }
 var
     i, count, withSky: integer;
-    wrldEdid, cellRecordId: string;
+    wrldEdid, cellRecordId, acousticSpaceEdid, cellEdid: string;
     ref: IwbElement;
     position: TwbVector;
     c: TwbGridCell;
-    weatherRegionOriginal, weatherRegion, xtelLinkedRef, rCell: IwbElement;
+    weatherRegionOriginal, weatherRegion, xtelLinkedRef, rCell, acousticSpace: IwbElement;
 begin
     for i := 0 to Pred(xtelRefs.Count) do begin
         ref := ObjectToElement(xtelRefs[i]);
@@ -177,6 +177,15 @@ begin
         if not Assigned(rCell) then continue;
         if Signature(rCell) <> 'CELL' then continue;
         if (GetElementNativeValues(rCell, 'DATA - Flags\Is Interior Cell') = 0) then continue;
+        acousticSpace := WinningOverride(LinksTo(ElementByPath(rCell, 'XCAS')));
+        acousticSpaceEdid := GetElementEditValues(acousticSpace, 'EDID');
+        //Skip caves
+        if ContainsText(acousticSpaceEdid, 'IntCave') then continue;
+        //Skip Institute
+        if ContainsText(acousticSpaceEdid, 'IntInstitute') then continue;
+        if ContainsText(acousticSpaceEdid, 'IntNauticalA') then continue;
+        if ContainsText(acousticSpaceEdid, 'IntSubway') then continue;
+        if ContainsText(acousticSpaceEdid, 'IntVault') then continue;
         //if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
         //if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
 
