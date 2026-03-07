@@ -6,7 +6,7 @@ unit xccm;
 
 var
     joWinningCells, joInteriors, joSounds, joImageSpaces, joWeatherRegions, joWeathers: TJsonObject;
-    xtelRefs, tlWeatherRegions: TList;
+    xtelRefs, tlWeatherRegions, tlWeatherClimates: TList;
     slCellsWithSky, slCellsToBlockSound: TStringList;
     xccmPatchFile: IwbFile;
     exteriorWeatherSoundCategory, interiorWeatherSoundCategory: IwbElement;
@@ -38,6 +38,7 @@ begin
         slCellsToBlockSound.Sorted := True;
         slCellsToBlockSound.Duplicates := dupIgnore;
         tlWeatherRegions := TList.Create;
+        tlWeatherClimates := TList.Create;
         sl := TStringList.Create;
 
         bLightPlugin := True;
@@ -94,6 +95,7 @@ begin
         joWeathers.Free;
         xtelRefs.Free;
         tlWeatherRegions.Free;
+        tlWeatherClimates.Free;
         slCellsWithSky.Free;
         slCellsToBlockSound.Free;
         sl.Free;
@@ -221,7 +223,7 @@ var
     recordid, wrldEdid, cellX, cellY: string;
     f: IwbFile;
     g, wrldgroup, refs: IwbGroupRecord;
-    rWrld, block, subblock, rCell, ref: IwbElement;
+    rWrld, block, subblock, rCell, ref, clmt: IwbElement;
 begin
     AddMessage('Collecting cells and interiors...');
     count := 0;
@@ -291,6 +293,15 @@ begin
                 //if count > 10 then break;
             end;
             //if count > 10 then break;
+        end;
+
+        g := GroupBySignature(f, 'CLMT');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            clmt := ElementByIndex(g, j);
+            if not IsWinningOverride(clmt) then continue;
+            if ReferencedByCount(clmt) = 0 then continue;
+            if not ElementExists(clmt, 'WLST') then continue;
+            tlWeatherClimates.Add(clmt);
         end;
     end;
     AddMessage('Found ' + IntToStr(count) + ' interior cells with Show Sky flag set.');
@@ -420,10 +431,12 @@ begin
         rCell := WinningOverride(GetRecordFromFormIdFileId(cellRecordId));
         originalWeatherRegion := joInteriors.O[cellRecordId].S['OriginalWeatherRegion'];
 
-        //Skip if the cell already has the correct weather region assigned to it.
-        for a := 0 to Pred(joInteriors.O[cellRecordId].O['CorrectedWeatherRegions'].Count) do begin
-            if SameText(joInteriors.O[cellRecordId].O['CorrectedWeatherRegions'].Names[a], originalWeatherRegion) then begin
-                bSkip := True;
+        if (GetElementNativeValues(rCellOverride, 'DATA - Flags\Show Sky') <> 0) then begin
+            //Skip if the cell already has the correct weather region assigned to it.
+            for a := 0 to Pred(joInteriors.O[cellRecordId].O['CorrectedWeatherRegions'].Count) do begin
+                if SameText(joInteriors.O[cellRecordId].O['CorrectedWeatherRegions'].Names[a], originalWeatherRegion) then begin
+                    bSkip := True;
+                end;
             end;
         end;
         if bSkip then continue;
@@ -487,7 +500,7 @@ begin
                 // end;
             end else AddMessage('Cell is using sky lighting but the corrected weather region does not have precipitation, so it is safe to assign the corrected weather region for this cell.');
         end;
-        if SameText(originalWeatherRegion, 'NONE') and not Assigned(newWeatherRegion) then continue; //No original weather region and no corrected weather region, so skip this cell since there is no mismatch.
+        //if SameText(originalWeatherRegion, 'NONE') and not Assigned(newWeatherRegion) then continue; //No original weather region and no corrected weather region, so skip this cell since there is no mismatch.
         Inc(totalChanged);
         AddMessage('Cell: ' + Name(rCell));
         if originalWeatherRegion <> 'NONE' then AddMessage(#9 + 'Original weather region: ' + Name(GetRecordFromFormIdFileId(originalWeatherRegion)));
@@ -751,6 +764,21 @@ begin
             end;
         end;
 
+        for i := 0 to Pred(tlWeatherClimates.Count) do begin
+            weatherRegion := WinningOverride(ObjectToElement(tlWeatherClimates[i]));
+            //AddMessage('Processing climate: ' + Name(weatherRegion));
+            weatherTypes := ElementByPath(weatherRegion, 'WLST');
+            for j := 0 to Pred(ElementCount(weatherTypes)) do begin
+                weatherType := ElementByIndex(weatherTypes, j);
+                weatherHere := LinksTo(ElementByIndex(weatherType, 0));
+                if Assigned(weatherHere) then begin
+                    weatherRecordId := RecordFormIdFileId(weatherHere);
+                    slWeatherRecordIds.Add(weatherRecordId);
+                    //AddMessage('Found weather: ' + Name(weatherHere));
+                end;
+            end;
+        end;
+
         for i := 0 to Pred(slWeatherRecordIds.Count) do begin
             //AddMessage('Processing weather record: ' + slWeatherRecordIds[i]);
             weatherOverride := nil;
@@ -766,16 +794,24 @@ begin
                 weatherSoundRecord := WinningOverride(LinksTo(ElementByIndex(weatherSound, 0)));
                 weatherSoundRecordEditorID := GetElementEditValues(weatherSoundRecord, 'EDID');
                 // if (ContainsText(weatherSoundRecordEditorID, 'rain') or ContainsText(weatherSoundRecordEditorID, 'thunder')) then begin
-                if Signature(weatherSoundRecord) <> 'SNDR' then continue; //If the returned record is not a sound descriptor, skip it.
                 if not Assigned(weatherSoundRecord) then continue;
+                if Signature(weatherSoundRecord) <> 'SNDR' then begin
+                    AddMessage('Expected a sound descriptor but got ' + Signature(weatherSoundRecord) + ' for ' + Name(weatherSoundRecord));
+                    continue;
+                end; //If the record is not a sound descriptor, skip it.
                 intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
                 if not Assigned(intExtSound) then continue;
+                if Signature(intExtSound) <> 'SNDR' then begin
+                    AddMessage('Expected a sound descriptor but got ' + Signature(intExtSound) + ' for ' + Name(weatherSoundRecord));
+                    continue;
+                end; //If the record is not a sound descriptor, skip it.
                 if SameText(RecordFormIdFileId(intExtSound), RecordFormIdFileId(weatherSoundRecord)) then continue; //No changes made to this sound, skip it.
                 if not Assigned(weatherOverride) then begin
                     AddRequiredElementMasters(weatherHere, xccmPatchFile, False, True);
                     SortMasters(xccmPatchFile);
                     weatherOverride := wbCopyElementToFile(weatherHere, xccmPatchFile, False, True);
                 end;
+                AddMessage(Name(weatherHere) + ': Adding attenuated sound for ' + Name(weatherSoundRecord) + ' as ' + Name(intExtSound));
                 SetElementEditValues(weatherOverride, 'Sounds\SNAM - Sound #' + IntToStr(e) + '\Sound', IntToHex(GetLoadOrderFormID(intExtSound), 8));
                 // end;
             end;
@@ -801,7 +837,8 @@ begin
     Result := nil;
     edid := GetElementEditValues(soundRecord, 'EDID');
     if joSounds.O[edid + '_Compound'].S['compound'] <> '' then begin
-        Result := GetRecordFromFormIdFileId(joSounds.O[edid + '_Compound'].S['compound']);
+        soundGroup := GroupBySignature(xccmPatchFile, 'SNDR');
+        Result := MainRecordByEditorID(soundGroup, edid + '_Compound');
         Exit;
     end;
     if SoundAlreadyHasInteriorConditionCheck(soundRecord) then Exit;
