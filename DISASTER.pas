@@ -301,6 +301,7 @@ procedure ProcessXTELRefs;
     Process collected XTEL references;
 }
 var
+    bAddCellToBlockSoundList: boolean;
     i, count, withSky: integer;
     wrldEdid, cellRecordId, acousticSpaceEdid, cellEdid, cellFormid: string;
     ref: IwbElement;
@@ -314,6 +315,7 @@ begin
         weatherRegion := nil;
         cellRecordId := '';
         cellFormid := '';
+        bAddCellToBlockSoundList := False;
         xtelLinkedRef := WinningOverride(LinksTo(ElementByPath(ref, 'XTEL\Door')));
         if not Assigned(xtelLinkedRef) then continue;
         rCell := WinningOverride(LinksTo(ElementByIndex(xtelLinkedRef, 0)));
@@ -328,11 +330,20 @@ begin
         cellFormid := IntToHex(GetLoadOrderFormID(rCell), 8);
 
         //Skip cells with these acoustic spaces.
-        if ContainsText(acousticSpaceEdid, 'IntCave') then slCellsToBlockSound.Add(cellFormid);
-        if ContainsText(acousticSpaceEdid, 'IntInstitute') then slCellsToBlockSound.Add(cellFormid);
-        if ContainsText(acousticSpaceEdid, 'IntNauticalA') then slCellsToBlockSound.Add(cellFormid);
-        if ContainsText(acousticSpaceEdid, 'IntSubway') then slCellsToBlockSound.Add(cellFormid);
-        if ContainsText(acousticSpaceEdid, 'IntVault') then slCellsToBlockSound.Add(cellFormid);
+        if ContainsText(acousticSpaceEdid, 'IntCave') then bAddCellToBlockSoundList := True;
+        if ContainsText(acousticSpaceEdid, 'IntInstitute') then bAddCellToBlockSoundList := True;
+        if ContainsText(acousticSpaceEdid, 'IntNauticalA') then bAddCellToBlockSoundList := True;
+        if ContainsText(acousticSpaceEdid, 'IntSubway') then bAddCellToBlockSoundList := True;
+        if ContainsText(acousticSpaceEdid, 'IntVault') then bAddCellToBlockSoundList := True;
+        if bAddCellToBlockSoundList then begin
+            if not Assigned(xccmPatchFile) then begin
+                xccmPatchFile := AddNewFileName('DISASTER.esp', bLightPlugin);
+                AddMasterIfMissing(xccmPatchFile, GetFileName(FileByIndex(0)));
+            end;
+            slCellsToBlockSound.Add(cellFormid);
+            AddRequiredElementMasters(rCell, xccmPatchFile, False, True);
+            SortMasters(xccmPatchFile);
+        end;
 
 
         //AddMessage('Processing XTEL reference: ' + Name(ref));
