@@ -766,6 +766,7 @@ begin
                 weatherSoundRecord := WinningOverride(LinksTo(ElementByIndex(weatherSound, 0)));
                 weatherSoundRecordEditorID := GetElementEditValues(weatherSoundRecord, 'EDID');
                 // if (ContainsText(weatherSoundRecordEditorID, 'rain') or ContainsText(weatherSoundRecordEditorID, 'thunder')) then begin
+                if Signature(weatherSoundRecord) <> 'SNDR' then continue; //If the returned record is not a sound descriptor, skip it.
                 if not Assigned(weatherSoundRecord) then continue;
                 intExtSound := MakeAttenuatedCompoundSound(weatherSoundRecord);
                 if not Assigned(intExtSound) then continue;
