@@ -22,6 +22,7 @@ function Initialize: integer;
 var
     fs: TFileStream;
     cmdline: string;
+    sl: TStringList;
 begin
     Result := 0;
     try
@@ -37,6 +38,7 @@ begin
         slCellsToBlockSound.Sorted := True;
         slCellsToBlockSound.Duplicates := dupIgnore;
         tlWeatherRegions := TList.Create;
+        sl := TStringList.Create;
 
         bLightPlugin := True;
 
@@ -53,12 +55,22 @@ begin
             DeleteDirectory(wbScriptsPath + 'DISASTER\output');
 
             EnsureDirectoryExists(wbScriptsPath + 'DISASTER\output\');
+
             fs := TFileStream.Create(wbScriptsPath + 'DISASTER\output\DISASTER.esp', fmCreate);
             try
                 FileWriteToStream(xccmPatchFile, fs, 0);
             finally
                 fs.Free;
             end;
+
+            // EnsureDirectoryExists(wbScriptsPath + 'DISASTER\output\fomod\');
+            // sl.Add('<fomod>');
+            // sl.Add('    <Name>DISASTER</Name>');
+            // sl.Add('    <Author>DoubleYou</Author>');
+            // sl.Add('    <Version>1.0</Version>');
+            // sl.Add('    <Website>https://www.nexusmods.com/fallout4/mods/102278</Website>');
+            // sl.Add('</fomod>');
+            // sl.SaveToFile(wbScriptsPath + 'DISASTER\output\fomod\info.xml');
 
             //Zip up output for easy installation
             AddMessage('Zipping up output for easy installation...');
@@ -84,6 +96,7 @@ begin
         tlWeatherRegions.Free;
         slCellsWithSky.Free;
         slCellsToBlockSound.Free;
+        sl.Free;
     end;
 end;
 
@@ -106,6 +119,8 @@ var
 begin
     Result := True;
     Exit;
+
+    //GUI disabled for now since there are no options, but leaving code here in case I want to add options later.
     frm := TForm.Create(nil);
     try
         frm.Caption := 'Dynamic Interior Skies And Sounds Tied to Exterior Regions';
@@ -305,18 +320,20 @@ begin
         if not Assigned(rCell) then continue;
         if Signature(rCell) <> 'CELL' then continue;
         if (GetElementNativeValues(rCell, 'DATA - Flags\Is Interior Cell') = 0) then continue;
+        //if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
+        if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
+
         acousticSpace := WinningOverride(LinksTo(ElementByPath(rCell, 'XCAS')));
         acousticSpaceEdid := GetElementEditValues(acousticSpace, 'EDID');
         cellFormid := IntToHex(GetLoadOrderFormID(rCell), 8);
-        //Skip caves
+
+        //Skip cells with these acoustic spaces.
         if ContainsText(acousticSpaceEdid, 'IntCave') then slCellsToBlockSound.Add(cellFormid);
-        //Skip Institute
         if ContainsText(acousticSpaceEdid, 'IntInstitute') then slCellsToBlockSound.Add(cellFormid);
         if ContainsText(acousticSpaceEdid, 'IntNauticalA') then slCellsToBlockSound.Add(cellFormid);
         if ContainsText(acousticSpaceEdid, 'IntSubway') then slCellsToBlockSound.Add(cellFormid);
         if ContainsText(acousticSpaceEdid, 'IntVault') then slCellsToBlockSound.Add(cellFormid);
-        //if (GetElementNativeValues(rCell, 'DATA - Flags\Show Sky') = 0) then continue;
-        //if (GetElementNativeValues(rCell, 'DATA - Flags\Use Sky Lighting') <> 0) then continue;
+
 
         //AddMessage('Processing XTEL reference: ' + Name(ref));
         if ElementExists(rCell, 'XCCM') then begin
@@ -804,8 +821,8 @@ begin
             for c := 0 to Pred(slCellsToBlockSound.Count) do begin
                 AddCondition(intSound, '10000000', 'GetInCell', '0.0', 'Subject', slCellsToBlockSound[c]);
             end;
-            //Increase attenuation by 20db for interiors
-            SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
+            //Increase attenuation by 5db for interiors
+            SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 500));
             //set output model to have increased reverb for interiors.
             if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
                 SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
@@ -848,8 +865,8 @@ begin
         for c := 0 to Pred(slCellsToBlockSound.Count) do begin
             AddCondition(intSound, '10000000', 'GetInCell', '0.0', 'Subject', slCellsToBlockSound[c]);
         end;
-        //Increase attenuation by 20db for interiors
-        SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 2000));
+        //Increase attenuation by 5db for interiors
+        SetElementNativeValues(intSound, 'BNAM - Data\Values\Static Attenuation (db)', (currentAttenuation + 500));
         //set output model to have increased reverb for interiors.
         if SameText(EditorID(LinksTo(ElementByPath(intSound, 'ONAM'))), 'SOMStereo') then
             SetElementEditValues(intSound, 'ONAM', 'd78b8'); //SOMStereo_verb
@@ -904,7 +921,7 @@ begin
     SetElementEditValues(interiorWeatherSoundCategory, 'FNAM\Should Appear on Menu', '1');
     SetElementEditValues(interiorWeatherSoundCategory, 'FNAM\Mute When Submerged', '1');
     SetElementEditValues(interiorWeatherSoundCategory, 'VNAM', '1.0');
-    SetElementEditValues(interiorWeatherSoundCategory, 'UNAM', '1.0');
+    SetElementEditValues(interiorWeatherSoundCategory, 'UNAM', '0.65');
     SetElementEditValues(interiorWeatherSoundCategory, 'MNAM', '1.0');
     interiorWeatherSoundCategoryFormId := IntToHex(GetLoadOrderFormID(interiorWeatherSoundCategory), 8);
 end;
