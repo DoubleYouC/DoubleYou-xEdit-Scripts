@@ -22,7 +22,7 @@ function Initialize: integer;
 var
     fs: TFileStream;
     cmdline: string;
-    sl: TStringList;
+    slInfo, slModuleConfig: TStringList;
 begin
     Result := 0;
     try
@@ -39,7 +39,8 @@ begin
         slCellsToBlockSound.Duplicates := dupIgnore;
         tlWeatherRegions := TList.Create;
         tlWeatherClimates := TList.Create;
-        sl := TStringList.Create;
+        slInfo := TStringList.Create;
+        slModuleConfig := TStringList.Create;
 
         bLightPlugin := True;
 
@@ -64,14 +65,39 @@ begin
                 fs.Free;
             end;
 
-            // EnsureDirectoryExists(wbScriptsPath + 'DISASTER\output\fomod\');
-            // sl.Add('<fomod>');
-            // sl.Add('    <Name>DISASTER</Name>');
-            // sl.Add('    <Author>DoubleYou</Author>');
-            // sl.Add('    <Version>1.0</Version>');
-            // sl.Add('    <Website>https://www.nexusmods.com/fallout4/mods/102278</Website>');
-            // sl.Add('</fomod>');
-            // sl.SaveToFile(wbScriptsPath + 'DISASTER\output\fomod\info.xml');
+            EnsureDirectoryExists(wbScriptsPath + 'DISASTER\output\fomod\');
+            slInfo.Add('<fomod>');
+            slInfo.Add(#9 + '<Name>DISASTER</Name>');
+            slInfo.Add(#9 + '<Author>DoubleYou</Author>');
+            slInfo.Add(#9 + '<Version>1.1.1</Version>');
+            slInfo.Add(#9 + '<Website>https://www.nexusmods.com/fallout4/mods/102278</Website>');
+            slInfo.Add(#9 + '<Id>102278</Id>');
+            slInfo.Add('</fomod>');
+            slInfo.SaveToFile(wbScriptsPath + 'DISASTER\output\fomod\info.xml');
+
+            slModuleConfig.Add('<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">');
+            slModuleConfig.Add(#9 + '<moduleName>DISASTER</moduleName>');
+            slModuleConfig.Add(#9 + '<installSteps order="Explicit">');
+            slModuleConfig.Add(#9#9 + '<installStep name="Options">');
+            slModuleConfig.Add(#9#9#9 + '<optionalFileGroups order="Explicit">');
+            slModuleConfig.Add(#9#9#9#9 + '<group name="Core Files" type="SelectAll">');
+            slModuleConfig.Add(#9#9#9#9#9 + '<plugins order="Explicit">');
+            slModuleConfig.Add(#9#9#9#9#9#9 + '<plugin name="Core Files">');
+            slModuleConfig.Add(#9#9#9#9#9#9#9 + '<description>Dynamic Interior Skies And Sounds Tied to Exterior Regions solves the issue where weather abruptly changes whenever you enter an interior cell.</description>');
+            slModuleConfig.Add(#9#9#9#9#9#9#9 + '<files>');
+            slModuleConfig.Add(#9#9#9#9#9#9#9#9 + '<file source="DISASTER.esp" destination="DISASTER.esp" priority="0" />');
+            slModuleConfig.Add(#9#9#9#9#9#9#9 + '</files>');
+            slModuleConfig.Add(#9#9#9#9#9#9#9 + '<typeDescriptor>');
+            slModuleConfig.Add(#9#9#9#9#9#9#9#9 + '<type name="Optional"/>');
+            slModuleConfig.Add(#9#9#9#9#9#9#9 + '</typeDescriptor>');
+            slModuleConfig.Add(#9#9#9#9#9#9 + '</plugin>');
+            slModuleConfig.Add(#9#9#9#9#9 + '</plugins>');
+            slModuleConfig.Add(#9#9#9#9 + '</group>');
+            slModuleConfig.Add(#9#9#9 + '</optionalFileGroups>');
+            slModuleConfig.Add(#9#9 + '</installStep>');
+            slModuleConfig.Add(#9 + '</installSteps>');
+            slModuleConfig.Add('</config>');
+            slModuleConfig.SaveToFile(wbScriptsPath + 'DISASTER\output\fomod\ModuleConfig.xml');
 
             //Zip up output for easy installation
             AddMessage('Zipping up output for easy installation...');
@@ -98,7 +124,8 @@ begin
         tlWeatherClimates.Free;
         slCellsWithSky.Free;
         slCellsToBlockSound.Free;
-        sl.Free;
+        slInfo.Free;
+        slModuleConfig.Free;
     end;
 end;
 
@@ -227,6 +254,48 @@ var
 begin
     AddMessage('Collecting cells and interiors...');
     count := 0;
+    for i := Pred(FileCount) downto 0 do begin
+        f := FileByIndex(i);
+        if GetFileName(f) = 'DISASTER.esp' then begin
+            xccmPatchFile := f;
+
+            //Remove any existing CELLs from old patch
+            if HasGroup(xccmPatchFile, 'CELL') then begin
+                RemoveNode(GroupBySignature(xccmPatchFile, 'CELL'));
+            end;
+
+            //Remove previously made ImagesSpaces from old patch
+            if HasGroup(xccmPatchFile, 'IMGS') then begin
+                RemoveNode(GroupBySignature(xccmPatchFile, 'IMGS'));
+            end;
+
+            //Keep Previously made Interior Sounds Category
+            if HasGroup(xccmPatchFile, 'SNCT') then begin
+                g := GroupBySignature(xccmPatchFile, 'SNCT');
+                for j := 0 to Pred(ElementCount(g)) do begin
+                    interiorWeatherSoundCategory := ElementByIndex(g, j);
+                end;
+            end;
+
+            //Remove previously made Sound Descriptors from old patch
+            if HasGroup(xccmPatchFile, 'SNDR') then begin
+                RemoveNode(GroupBySignature(xccmPatchFile, 'SNDR'));
+            end;
+
+            //Remove previously made Weathers from old patch
+            if HasGroup(xccmPatchFile, 'WTHR') then begin
+                RemoveNode(GroupBySignature(xccmPatchFile, 'WTHR'));
+            end;
+
+            //Remove previously made Worldspaces from old patch
+            if HasGroup(xccmPatchFile, 'WRLD') then begin
+                RemoveNode(GroupBySignature(xccmPatchFile, 'WRLD'));
+            end;
+            CleanMasters(xccmPatchFile);
+            break;
+        end;
+    end;
+
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
 
@@ -1294,6 +1363,15 @@ begin
     if not DirectoryExists(f) then
         if not ForceDirectories(f) then
             raise Exception.Create('Can not create destination directory ' + f);
+end;
+
+function TrimLeftChars(s: string; chars: integer): string;
+{
+    Returns left string - chars
+    TrimLeftChars('Example', 3) -> 'Exam'
+}
+begin
+    Result := LeftStr(s, Length(s) - chars);
 end;
 
 end.
