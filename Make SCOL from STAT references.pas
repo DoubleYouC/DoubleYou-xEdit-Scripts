@@ -9,13 +9,14 @@ const
 var
     joSCOL: TJsonObject;
     orX, orY, orZ: Double;
-    TargetFile, OffsetFile: IInterface;
+    TargetFile, OffsetFile: IwbFile;
     offsetReferenceInt: integer;
     offsetReferenceStr, sOffsetMasterName, sTargetFileName, sSCOLEditorId: string;
 
 function Initialize: integer;
 var
-    offsetRef, f: IInterface;
+    offsetRef: IwbElement;
+    f: IwbFile;
     i: integer;
 begin
     if not InputQuery('Enter', 'Enter the offset reference formid. Format should be 1C9A49', offsetReferenceStr) then begin
@@ -44,13 +45,17 @@ begin
         Exit;
     end else AddMessage('Editor ID: ' + sSCOLEditorId);
 
-    for i := 0 to Pred(FileCount) do begin
-        f := GetFileName(FileByIndex(i));
-        if SameText(f, sOffsetMasterName) then
-            OffsetFile := FileByIndex(i)
-        else if SameText(f, sTargetFileName) then
-            TargetFile := FileByIndex(i);
+    OffsetFile := FileByName(sOffsetMasterName);
+    TargetFile := FileByName(sTargetFileName);
+
+    if Assigned(TargetFile) then
+        AddMessage('Target file found: ' + Name(TargetFile))
+    else begin
+        AddMessage('Target file not found: ' + sTargetFileName);
+        Result := 2;
+        Exit;
     end;
+
 
     offsetRef := RecordByFormID(OffsetFile, offsetReferenceInt, False);
     orX := GetElementNativeValues(offsetRef, 'DATA\Position\X');
