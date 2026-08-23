@@ -5,6 +5,9 @@ unit NoWaterLOD;
 
 var
     joElements: TJsonObject;
+    NoLodPlugin: IwbFile;
+    statGroup, scolGroup: IwbGroupRecord;
+    water4096, water1024, watercircle: string;
 
 const
     sIgnoredWorldspaces = '00000F93:Fallout4.esm, 00000F94:Fallout4.esm, 00054BD5:Fallout4.esm, 000A7FF4:Fallout4.esm, 01000810:DLCCoast.esm, 010014F4:DLCCoast.esm, 01004EA4:DLCCoast.esm, 01008B56:DLCNukaWorld.esm, 01052931:DLCNukaWorld.esm, 01053C58:DLCNukaWorld.esm';
@@ -18,11 +21,32 @@ begin
     Result := 0;
     joElements := TJsonObject.Create;
     try
+        //create plugin
+        // NoLodPlugin := AddNewFileName(SeasonsMainFileName, False);
+        // AddMasterIfMissing(NoLodPlugin, GetFileName(FileByIndex(0)));
+        // statGroup := Add(NoLodPlugin, 'STAT', True);
+        // scolGroup := Add(NoLodPlugin, 'SCOL', True);
+        // water4096 := CreateWaterStat('DefaultProceduralWater', 'waterstatic\DefaultProceduralWater.nif');
+        // water1024 := CreateWaterStat('Water1024', 'waterstatic\Water1024.nif');
+        // watercircle := CreateWaterStat('WaterCircle1024', 'waterstatic\WaterCircle1024.nif');
+
         CollectRecords;
     finally
-        joElements.SaveToFile(wbScriptsPath + 'joWater.json', False, TEncoding.UTF8, True);
+        joElements.SaveToFile(wbScriptsPath + 'NoWaterLOD\joWater.json', False, TEncoding.UTF8, True);
         joElements.Free;
     end;
+end;
+
+function CreateWaterStat(edid, model: string): string;
+var
+    newStatic: IwbMainRecord;
+    newStaticModel: IwbElement;
+begin
+    newStatic := Add(statGroup, 'STAT', True);
+    SetEditorID(newStatic, edid);
+    newStaticModel := Add(Add(newStatic, 'Model', True), 'MODL', True);
+    SetEditValue(newStaticModel, model);
+    Result := IntToHex(GetLoadOrderFormID(newStatic), 8);
 end;
 
 procedure CollectRecords;
@@ -30,14 +54,16 @@ procedure CollectRecords;
     Collect records;
 }
 var
-    i, j, blockidx, subblockidx, cellidx: integer;
-    fileName, recordid, cellX, cellY, defaultWaterHeight, cellWaterHeight, waterRecordId, cellWaterRecordId, wrldEdid: string;
-    bHasWater: boolean;
+    i, j, h, blockidx, subblockidx, cellidx: integer;
+    fileName, wrldRecordId, cellX, cellY, defaultWaterHeight, cellWaterHeight, recordId,
+    waterRecordId, cellWaterRecordId, wrldEdid, model, waterhere, scale, parentref,
+    px, py, pz, rx, ry, rz: string;
+    bHasWater, bOppositeEnableParent: boolean;
 
     f: IwbFile;
     g, wrldgroup: IwbGroupRecord;
-    rWrld, wWrld, rCell, wCell, land: IwbMainRecord;
-    block, subblock, water, cellWater: IwbElement;
+    rWrld, wWrld, rCell, wCell, land, acti, r: IwbMainRecord;
+    block, subblock, water, cellWater, waterType, xesp: IwbElement;
 begin
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
@@ -47,8 +73,8 @@ begin
         g := GroupBySignature(f, 'WRLD');
         for j := 0 to Pred(ElementCount(g)) do begin
             rWrld := ElementByIndex(g, j);
-            recordid := RecordFormIdFileId(rWrld);
-            if Pos(recordid, sIgnoredWorldspaces) <> 0 then continue;
+            wrldRecordId := RecordFormIdFileId(rWrld);
+            if Pos(wrldRecordId, sIgnoredWorldspaces) <> 0 then continue;
             wrldEdid := EditorID(rWrld);
             wWrld := WinningOverride(rWrld);
             water := ElementByPath(wWrld, 'NAM2');
@@ -56,7 +82,7 @@ begin
             waterRecordId := RecordFormIdFileId(LinksTo(water));
             defaultWaterHeight := GetElementEditValues(wWrld, 'DNAM\Default Water Height');
 
-            joElements.O['worldspaces'].O[wrldEdid].S['RecordID'] := recordid;
+            joElements.O['worldspaces'].O[wrldEdid].S['RecordID'] := wrldRecordId;
             joElements.O['worldspaces'].O[wrldEdid].S['Default Water'] := waterRecordId;
             joElements.O['worldspaces'].O[wrldEdid].S['Default Water Height'] := defaultWaterHeight;
             AddMessage(wrldEdid + #9 + waterRecordId + #9 + defaultWaterHeight);
@@ -88,13 +114,49 @@ begin
                         if not SameText(cellWaterHeight, defaultWaterHeight) then
                             joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['XCLW'] := cellWaterHeight;
                         AddMessage(#9 + wrldEdid + ' [' + cellX + ',' + cellY + ']' + #9 + cellWaterRecordId + #9 + cellWaterHeight);
-
-                        
                     end;
                 end;
             end;
         end;
 
+        //Collect Water ACTI
+        g := GroupBySignature(f, 'ACTI');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            acti := ElementByIndex(g, j);
+            waterType := ElementByPath(acti, 'WNAM');
+            if not Assigned(waterType) then continue;
+            waterRecordId := RecordFormIdFileId(LinksTo(waterType));
+            if not IsWinningOverride(acti) then continue;
+            model := GetElementEditValues(acti, 'Model\MODL');
+            if ContainsText(model, 'Water1024.nif') then waterhere := water1024
+            else if ContainsText(model, 'WaterCircle1024.nif') then waterhere := watercircle
+            else continue;
+            for h := Pred(ReferencedByCount(acti)) downto 0 do begin
+                r := ReferencedByIndex(acti, h);
+                if Signature(r) <> 'REFR' then continue;
+                if not IsWinningOverride(r) then continue;
+                rCell := LinksTo(ElementByIndex(r, 0));
+                if IsInteriorCell(rCell) then continue;
+                rWrld := LinksTo(ElementByIndex(rCell, 0));
+                wrldEdid := EditorID(rWrld);
+                wrldRecordId := RecordFormIdFileId(rWrld);
+                if Pos(wrldRecordId, sIgnoredWorldspaces) <> 0 then continue;
+                recordId := RecordFormIdFileId(r);
+                if ElementExists(r, 'XSCL') then scale := GetElementEditValues(r, 'XSCL') else scale := '1';
+                px := GetElementEditValues(r, 'DATA\Position\X');
+                py := GetElementEditValues(r, 'DATA\Position\Y');
+                pz := GetElementEditValues(r, 'DATA\Position\Z');
+                rx := GetElementEditValues(r, 'DATA\Rotation\X');
+                ry := GetElementEditValues(r, 'DATA\Rotation\Y');
+                rz := GetElementEditValues(r, 'DATA\Rotation\Z');
+                xesp := ElementByPath(r, 'XESP');
+                if Assigned(xesp) then begin
+                    bOppositeEnableParent := (GetElementNativeValues(r, 'XESP\Flags\Set Enable State to Opposite of Parent') <> 0);
+                    parentref := IntToHex(GetLoadOrderFormID(LinksTo(ElementByName(xesp, 'Reference'))), 8);
+                    joElements.O['wateracti'].O[wrldEdid].O[waterRecordId].O[parentref].O[BoolToStr(bOppositeEnableParent)].A['refs'].Add(scale, px, py, pz, rx, ry, rz);
+                end else joElements.O['wateracti'].O[wrldEdid].O[waterRecordId].A['refs'].Add(scale, px, py, pz, rx, ry, rz);
+            end;
+        end;
 
     end;
 end;
@@ -154,6 +216,11 @@ begin
         Result := r;
         Exit;
     end;
+end;
+
+function IsInteriorCell(cell: IwbMainRecord): boolean;
+begin
+    Result := (GetElementNativeValues(cell, 'DATA - Flags\Is Interior Cell') <> 0);
 end;
 
 function RecordFormIdFileId(e: IwbMainRecord): string;
