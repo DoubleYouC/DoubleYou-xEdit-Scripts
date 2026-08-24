@@ -21,16 +21,17 @@ begin
     Result := 0;
     joElements := TJsonObject.Create;
     try
-        //create plugin
-        // NoLodPlugin := AddNewFileName(SeasonsMainFileName, False);
-        // AddMasterIfMissing(NoLodPlugin, GetFileName(FileByIndex(0)));
-        // statGroup := Add(NoLodPlugin, 'STAT', True);
-        // scolGroup := Add(NoLodPlugin, 'SCOL', True);
-        // water4096 := CreateWaterStat('DefaultProceduralWater', 'waterstatic\DefaultProceduralWater.nif');
-        // water1024 := CreateWaterStat('Water1024', 'waterstatic\Water1024.nif');
-        // watercircle := CreateWaterStat('WaterCircle1024', 'waterstatic\WaterCircle1024.nif');
+        // create plugin
+        NoLodPlugin := AddNewFileName('NoWaterLOD.esp', False);
+        AddMasterIfMissing(NoLodPlugin, GetFileName(FileByIndex(0)));
+        statGroup := Add(NoLodPlugin, 'STAT', True);
+        scolGroup := Add(NoLodPlugin, 'SCOL', True);
+        water4096 := CreateWaterStat('DefaultProceduralWater', 'waterstatic\DefaultProceduralWater.nif');
+        water1024 := CreateWaterStat('Water1024', 'waterstatic\Water1024.nif');
+        watercircle := CreateWaterStat('WaterCircle1024', 'waterstatic\WaterCircle1024.nif');
 
         CollectRecords;
+        ProcessWater;
     finally
         joElements.SaveToFile(wbScriptsPath + 'NoWaterLOD\joWater.json', False, TEncoding.UTF8, True);
         joElements.Free;
@@ -95,8 +96,8 @@ begin
                     for cellidx := 0 to Pred(ElementCount(subblock)) do begin
                         rCell := ElementByIndex(subblock, cellidx);
                         if (Signature(rCell) <> 'CELL') then continue;
-                        cellX := GetElementNativeValues(rCell, 'XCLC\X');
-                        cellY := GetElementNativeValues(rCell, 'XCLC\Y');
+                        cellX := GetElementEditValues(rCell, 'XCLC\X');
+                        cellY := GetElementEditValues(rCell, 'XCLC\Y');
                         wCell := WinningOverride(rCell);
                         bHasWater := (GetElementNativeValues(wCell,'DATA\Has Water') <> 0);
                         if not bHasWater then continue;
@@ -113,6 +114,10 @@ begin
                         joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['ID'] := RecordFormIdFileId(rCell);
                         if not SameText(cellWaterHeight, defaultWaterHeight) then
                             joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['XCLW'] := cellWaterHeight;
+                        px := StrToInt(cellX) * 4096 + 2048;
+                        py := StrToInt(cellY) * 4096 + 2048;
+                        pz := cellWaterHeight;
+                        joElements.O['water acti'].O[wrldEdid].O[cellWaterRecordId].O[water4096].A['refs'].Add('1' + '|' + px + '|' + py + '|' + pz + '|' + '0' + '|' + '0' + '|' + '0');
                         AddMessage(#9 + wrldEdid + ' [' + cellX + ',' + cellY + ']' + #9 + cellWaterRecordId + #9 + cellWaterHeight);
                     end;
                 end;
@@ -153,12 +158,102 @@ begin
                 if Assigned(xesp) then begin
                     bOppositeEnableParent := (GetElementNativeValues(r, 'XESP\Flags\Set Enable State to Opposite of Parent') <> 0);
                     parentref := IntToHex(GetLoadOrderFormID(LinksTo(ElementByName(xesp, 'Reference'))), 8);
-                    joElements.O['wateracti'].O[wrldEdid].O[waterRecordId].O[parentref].O[BoolToStr(bOppositeEnableParent)].A['refs'].Add(scale, px, py, pz, rx, ry, rz);
-                end else joElements.O['wateracti'].O[wrldEdid].O[waterRecordId].A['refs'].Add(scale, px, py, pz, rx, ry, rz);
+                    joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].O[parentref].O[BoolToStr(bOppositeEnableParent)].O[waterhere].A['refs'].Add(scale + '|' + px + '|' + py + '|' + pz + '|' + rx + '|' + ry + '|' + rz);
+                end else begin
+                    joElements.O['water acti'].O[wrldEdid].O[waterRecordId].O[waterhere].A['refs'].Add(scale + '|' + px + '|' + py + '|' + pz + '|' + rx + '|' + ry + '|' + rz);
+                end;
             end;
         end;
 
     end;
+end;
+
+procedure ProcessWater;
+var
+    w, j, p, o: integer;
+    wrldEdid, waterRecordId, parentref, bOppositeEnableParent: string;
+begin
+    for w := 0 to Pred(joElements.O['water acti'].Count) do begin
+        wrldEdid := joElements.O['water acti'].Names[w];
+        for j := 0 to Pred(joElements.O['water acti'].O[wrldEdid].Count) do begin
+            waterRecordId := joElements.O['water acti'].O[wrldEdid].Names[j];
+            MakeWaterSCOL(wrldEdid, waterRecordId, '', false, joElements.O['water acti'].O[wrldEdid].O[waterRecordId]);
+        end;
+    end;
+
+    for w := 0 to Pred(joElements.O['water acti xesp'].Count) do begin
+        wrldEdid := joElements.O['water acti xesp'].Names[w];
+        for j := 0 to Pred(joElements.O['water acti xesp'].O[wrldEdid].Count) do begin
+            waterRecordId := joElements.O['water acti xesp'].O[wrldEdid].Names[j];
+            for p := 0 to Pred(joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].Count) do begin
+                parentref := joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].Names[p];
+                for o := 0 to Pred(joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].O[parentref].Count) do begin
+                    bOppositeEnableParent := joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].O[parentref].Names[o];
+                    MakeWaterSCOL(wrldEdid, waterRecordId, parentref, bOppositeEnableParent, joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId]);
+                end;
+            end;
+        end;
+    end;
+end;
+
+function MakeWaterSCOL(wrldEdid, waterRecordId, parentref, bOppositeEnableParent: string; waterJson: TJsonObject): IwbMainRecord;
+{
+    Creates a SCOL for a cell based on placement data.
+}
+var
+    waterSCOL: IwbMainRecord;
+    parts, part, onam, placements, placement: IwbElement;
+    i, n, p: integer;
+    waterhere, Token, placementValue: string;
+begin
+    Result := nil;
+    waterSCOL := Add(scolGroup, 'SCOL', True);
+    SetEditorID(waterSCOL, wrldEdid + '_' + StripNonAlphanumeric(waterRecordId) + '_' + parentref + '_' + bOppositeEnableParent);
+
+    //Add Parts
+    parts := Add(waterSCOL, 'Parts', True);
+    part := ElementbyIndex(parts, 0);
+    onam := ElementByPath(part, 'ONAM');
+    SetEditValue(onam, 'StaticCollectionPivotDummy [STAT:00035812]');
+
+    for i := 0 to Pred(waterJson.Count) do begin
+        waterhere := waterJson.Names[i];
+        // Add ONAM for each base STAT
+        part := Add(parts, 'Part', True);
+        onam := ElementByPath(part, 'ONAM');
+        SetEditValue(onam, waterhere);
+
+        placements := Add(part, 'DATA', True);
+        for p := 0 to Pred(waterJson.O[waterhere].A['refs'].Count) do begin
+            placement := Add(placements, 'Placement', True);
+            placementValue := placementJson.O[waterhere].A['refs'].S[p];
+            n := 0;
+            while placementValue <> '' do begin
+                DelimPos := Pos('|', placementValue);
+                if DelimPos > 0 then begin
+                    Token := Copy(placementValue, 1, DelimPos - 1);
+                    Delete(placementValue, 1, DelimPos);
+                end
+                else begin
+                    Token := placementValue;
+                    placementValue := '';
+                end;
+                n := n + 1;
+
+                Case n of
+                    1 : SetElementEditValues(placement, 'Scale', Token);
+                    2 : SetElementEditValues(placement, 'Position\X', Token);
+                    3 : SetElementEditValues(placement, 'Position\Y', Token);
+                    4 : SetElementEditValues(placement, 'Position\Z', Token);
+                    5 : SetElementEditValues(placement, 'Rotation\X', Token);
+                    6 : SetElementEditValues(placement, 'Rotation\Y', Token);
+                    7 : SetElementEditValues(placement, 'Rotation\Z', Token);
+                end;
+            end;
+        end;
+
+    end;
+    Result := waterSCOL;
 end;
 
 function WaterAboveLand(land: IwbMainRecord; cellWaterHeight: string): boolean;
@@ -238,6 +333,28 @@ function BoolToStr(b: boolean): string;
 }
 begin
     if b then Result := 'true' else Result := 'false';
+end;
+
+function StrToBool(str: string): boolean;
+{
+    Given a string, return a boolean.
+}
+begin
+    if (LowerCase(str) = 'true') or (str = '1') then Result := True else Result := False;
+end;
+
+function StripNonAlphanumeric(Input: string): string;
+var
+  i: Integer;
+  c: char;
+begin
+    Result := '';
+    i := 1;
+    while i <= Length(Input) do begin
+        c := Copy(Input,i,1);
+        if Pos(c,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789') <> 0 then Result := Result + c;
+        inc(i);
+    end;
 end;
 
 end.
