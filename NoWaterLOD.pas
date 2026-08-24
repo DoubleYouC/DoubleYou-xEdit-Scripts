@@ -30,8 +30,8 @@ begin
         water1024 := CreateWaterStat('Water1024', 'waterstatic\Water1024.nif');
         watercircle := CreateWaterStat('WaterCircle1024', 'waterstatic\WaterCircle1024.nif');
 
-        //CollectRecords;
-        joElements.LoadFromFile(wbScriptsPath + 'NoWaterLOD\joWater.json');
+        CollectRecords;
+        //joElements.LoadFromFile(wbScriptsPath + 'NoWaterLOD\joWater.json');
         ProcessWater;
     finally
         joElements.SaveToFile(wbScriptsPath + 'NoWaterLOD\joWater.json', False, TEncoding.UTF8, True);
@@ -87,9 +87,9 @@ begin
             waterRecordId := RecordFormIdFileId(LinksTo(water));
             defaultWaterHeight := GetElementEditValues(wWrld, 'DNAM\Default Water Height');
 
-            joElements.O['worldspaces'].O[wrldEdid].S['RecordID'] := wrldRecordId;
-            joElements.O['worldspaces'].O[wrldEdid].S['Default Water'] := waterRecordId;
-            joElements.O['worldspaces'].O[wrldEdid].S['Default Water Height'] := defaultWaterHeight;
+            // joElements.O['worldspaces'].O[wrldEdid].S['RecordID'] := wrldRecordId;
+            // joElements.O['worldspaces'].O[wrldEdid].S['Default Water'] := waterRecordId;
+            // joElements.O['worldspaces'].O[wrldEdid].S['Default Water Height'] := defaultWaterHeight;
             AddMessage(wrldEdid + #9 + waterRecordId + #9 + defaultWaterHeight);
 
             wrldgroup := ChildGroup(rWrld);
@@ -115,9 +115,9 @@ begin
                         cellWater := ElementByPath(wCell, 'XCWT');
                         if Assigned(cellWater) then cellWaterRecordId := RecordFormIdFileId(LinksTo(cellWater)) else cellWaterRecordId := waterRecordId;
 
-                        joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['ID'] := RecordFormIdFileId(rCell);
-                        if not SameText(cellWaterHeight, defaultWaterHeight) then
-                            joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['XCLW'] := cellWaterHeight;
+                        // joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['ID'] := RecordFormIdFileId(rCell);
+                        // if not SameText(cellWaterHeight, defaultWaterHeight) then
+                        //     joElements.O['worldspaces'].O[wrldEdid].O[cellWaterRecordId].O[cellX].O[cellY].S['XCLW'] := cellWaterHeight;
                         px := StrToInt(cellX) * 4096 + 2048;
                         py := StrToInt(cellY) * 4096 + 2048;
                         pz := cellWaterHeight;
@@ -144,6 +144,8 @@ begin
                 r := ReferencedByIndex(acti, h);
                 if Signature(r) <> 'REFR' then continue;
                 if not IsWinningOverride(r) then continue;
+                if GetIsCleanDeleted(r) then continue;
+                if GetIsDeleted(r) then continue;
                 rCell := LinksTo(ElementByIndex(r, 0));
                 if IsInteriorCell(rCell) then continue;
                 rWrld := LinksTo(ElementByIndex(rCell, 0));
@@ -196,7 +198,7 @@ begin
                 parentref := joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].Names[p];
                 for o := 0 to Pred(joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].O[parentref].Count) do begin
                     bOppositeEnableParent := joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].O[parentref].Names[o];
-                    MakeWaterSCOL(wrldEdid, waterRecordId, parentref, bOppositeEnableParent, joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId]);
+                    MakeWaterSCOL(wrldEdid, waterRecordId, parentref, bOppositeEnableParent, joElements.O['water acti xesp'].O[wrldEdid].O[waterRecordId].O[parentref].O[bOppositeEnableParent]);
                 end;
             end;
         end;
@@ -331,6 +333,18 @@ function IsInteriorCell(cell: IwbMainRecord): boolean;
 }
 begin
     Result := (GetElementNativeValues(cell, 'DATA - Flags\Is Interior Cell') <> 0);
+end;
+
+function GetIsCleanDeleted(r: IwbMainRecord): Boolean;
+{
+    Checks to see if a reference has an XESP set to opposite of the PlayerRef
+}
+begin
+    Result := False;
+    if not ElementExists(r, 'XESP') then Exit;
+    if (GetElementNativeValues(r, 'XESP\Flags\Set Enable State to Opposite of Parent') = 0) then Exit;
+    if (GetElementEditValues(r, 'XESP\Reference') <> 'PlayerRef [PLYR:00000014]') then Exit;
+    Result := True;
 end;
 
 function RecordFormIdFileId(e: IwbMainRecord): string;
