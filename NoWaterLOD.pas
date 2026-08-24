@@ -15,7 +15,7 @@ const
 
 function Initialize: integer;
 {
-  This function is called at the beginning.
+    This function is called at the beginning.
 }
 begin
     Result := 0;
@@ -40,6 +40,9 @@ begin
 end;
 
 function CreateWaterStat(edid, model: string): string;
+{
+    Create a water static record.
+}
 var
     newStatic: IwbMainRecord;
     newStaticModel: IwbElement;
@@ -170,6 +173,9 @@ begin
 end;
 
 procedure ProcessWater;
+{
+    Process water json
+}
 var
     w, j, p, o: integer;
     wrldEdid, waterRecordId, parentref, bOppositeEnableParent: string;
@@ -199,17 +205,18 @@ end;
 
 function MakeWaterSCOL(wrldEdid, waterRecordId, parentref, bOppositeEnableParent: string; waterJson: TJsonObject): IwbMainRecord;
 {
-    Creates a SCOL for a cell based on placement data.
+    Creates water SCOLs.
 }
 var
     waterSCOL: IwbMainRecord;
     parts, part, onam, placements, placement: IwbElement;
     i, n, p, DelimPos: integer;
-    waterhere, Token, placementValue: string;
+    waterhere, Token, placementValue, edid: string;
 begin
     Result := nil;
     waterSCOL := Add(scolGroup, 'SCOL', True);
-    SetEditorID(waterSCOL, wrldEdid + '_' + StripNonAlphanumeric(waterRecordId) + '_' + parentref + '_' + bOppositeEnableParent);
+    edid := wrldEdid + '_' + StripNonAlphanumeric(waterRecordId) + '_' + parentref + '_' + bOppositeEnableParent;
+    SetEditorID(waterSCOL, edid);
 
     //Add Parts
     parts := Add(waterSCOL, 'Parts', True);
@@ -228,6 +235,7 @@ begin
         for p := 0 to Pred(waterJson.O[waterhere].A['refs'].Count) do begin
             placement := Add(placements, 'Placement', True);
             placementValue := waterJson.O[waterhere].A['refs'].S[p];
+            AddMessage(edid + #9 + waterhere + #9 + placementValue);
             n := 0;
             while placementValue <> '' do begin
                 DelimPos := Pos('|', placementValue);
@@ -298,6 +306,9 @@ begin
 end;
 
 function GetLandscapeForCell(rCell: IwbMainRecord): IwbMainRecord;
+{
+    Gets the landscape record for the cell.
+}
 var
     i: integer;
 
@@ -315,6 +326,9 @@ begin
 end;
 
 function IsInteriorCell(cell: IwbMainRecord): boolean;
+{
+    Checks if a cell is in an interior.
+}
 begin
     Result := (GetElementNativeValues(cell, 'DATA - Flags\Is Interior Cell') <> 0);
 end;
@@ -345,6 +359,9 @@ begin
 end;
 
 function StripNonAlphanumeric(Input: string): string;
+{
+    Removes characters from a string that are not a number or letter.
+}
 var
   i: Integer;
   c: char;
