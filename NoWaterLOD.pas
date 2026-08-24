@@ -26,11 +26,12 @@ begin
         AddMasterIfMissing(NoLodPlugin, GetFileName(FileByIndex(0)));
         statGroup := Add(NoLodPlugin, 'STAT', True);
         scolGroup := Add(NoLodPlugin, 'SCOL', True);
-        water4096 := CreateWaterStat('DefaultProceduralWater', 'waterstatic\DefaultProceduralWater.nif');
+        //water4096 := CreateWaterStat('DefaultProceduralWater', 'waterstatic\DefaultProceduralWater.nif');
         water1024 := CreateWaterStat('Water1024', 'waterstatic\Water1024.nif');
         watercircle := CreateWaterStat('WaterCircle1024', 'waterstatic\WaterCircle1024.nif');
 
-        CollectRecords;
+        //CollectRecords;
+        joElements.LoadFromFile(wbScriptsPath + 'NoWaterLOD\joWater.json');
         ProcessWater;
     finally
         joElements.SaveToFile(wbScriptsPath + 'NoWaterLOD\joWater.json', False, TEncoding.UTF8, True);
@@ -117,7 +118,7 @@ begin
                         px := StrToInt(cellX) * 4096 + 2048;
                         py := StrToInt(cellY) * 4096 + 2048;
                         pz := cellWaterHeight;
-                        joElements.O['water acti'].O[wrldEdid].O[cellWaterRecordId].O[water4096].A['refs'].Add('1' + '|' + px + '|' + py + '|' + pz + '|' + '0' + '|' + '0' + '|' + '0');
+                        joElements.O['water acti'].O[wrldEdid].O[cellWaterRecordId].O[water1024].A['refs'].Add('4' + '|' + px + '|' + py + '|' + pz + '|' + '0' + '|' + '0' + '|' + '0');
                         AddMessage(#9 + wrldEdid + ' [' + cellX + ',' + cellY + ']' + #9 + cellWaterRecordId + #9 + cellWaterHeight);
                     end;
                 end;
@@ -177,7 +178,7 @@ begin
         wrldEdid := joElements.O['water acti'].Names[w];
         for j := 0 to Pred(joElements.O['water acti'].O[wrldEdid].Count) do begin
             waterRecordId := joElements.O['water acti'].O[wrldEdid].Names[j];
-            MakeWaterSCOL(wrldEdid, waterRecordId, '', false, joElements.O['water acti'].O[wrldEdid].O[waterRecordId]);
+            MakeWaterSCOL(wrldEdid, waterRecordId, '', 'false', joElements.O['water acti'].O[wrldEdid].O[waterRecordId]);
         end;
     end;
 
@@ -203,7 +204,7 @@ function MakeWaterSCOL(wrldEdid, waterRecordId, parentref, bOppositeEnableParent
 var
     waterSCOL: IwbMainRecord;
     parts, part, onam, placements, placement: IwbElement;
-    i, n, p: integer;
+    i, n, p, DelimPos: integer;
     waterhere, Token, placementValue: string;
 begin
     Result := nil;
@@ -226,7 +227,7 @@ begin
         placements := Add(part, 'DATA', True);
         for p := 0 to Pred(waterJson.O[waterhere].A['refs'].Count) do begin
             placement := Add(placements, 'Placement', True);
-            placementValue := placementJson.O[waterhere].A['refs'].S[p];
+            placementValue := waterJson.O[waterhere].A['refs'].S[p];
             n := 0;
             while placementValue <> '' do begin
                 DelimPos := Pos('|', placementValue);
