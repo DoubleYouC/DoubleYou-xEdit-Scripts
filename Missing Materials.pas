@@ -74,8 +74,49 @@ begin
                 AddMessage('Warning: STAT references a model that does not seem to exist: ' + ShortName(r) + #9 + model);
                 continue;
             end;
+            if not IsEverPrecombined(r) then continue;
             NifNeedsMaterial(model, r);
         end;
+    end;
+end;
+
+function IsEverPrecombined(s: IwbMainRecord): boolean;
+var
+    i: integer;
+    r: IwbMainRecord;
+begin
+    Result := false;
+    for i := Pred(ReferencedByCount(s)) downto 0 do begin
+        r := ReferencedByIndex(s, i);
+        if Signature(r) <> 'REFR' then continue;
+        if not IsWinningOverride(r) then continue;
+        if GetIsDeleted(r) then continue;
+        if GetIsCleanDeleted(r) then continue;
+        if not IsRefPrecombined(r) then continue;
+        Result := true;
+        break;
+    end;
+end;
+
+function IsRefPrecombined(r: IwbMainRecord): boolean;
+{
+    Checks if a reference is precombined.
+}
+var
+    i, t: integer;
+
+    rCell: IwbMainRecord;
+begin
+    Result := false;
+    t := ReferencedByCount(r) - 1;
+    if t < 0 then Exit;
+    for i := 0 to t do begin
+        rCell := ReferencedByIndex(r, i);
+        if Signature(rCell) <> 'CELL' then continue;
+        if not IsWinningOverride(rCell) then continue;
+        //AddMessage(ShortName(r) + ' is referenced in ' + Name(c));
+        Result := true;
+        Exit;
     end;
 end;
 
@@ -121,7 +162,7 @@ begin
                     if not ResourceExists(matPath) then continue;
                     block.EditValues['Name'] := matPath;
                     bChanged := true;
-                    slAddedMat.Add('Added material to model: ' + #9 + matPath + #9 + model + #9 + blockName);
+                    slAddedMat.Add(model + #9 + IntToStr(i) + ' ' + block.BlockType + '\Name: Assigned material to "' + matPath + '"');
                 end else begin
                     if not ResourceExists(mat) then begin
                         bBlockMissingMat := True;
@@ -131,7 +172,7 @@ begin
                     else if SameText(matExt, '.bgsm') then begin
                         bgsm.LoadFromResource(mat);
                         if ((bgsm.EditValues['Decal'] = 'yes') and (block.NativeValues['Shader Flags 1\Decal'] = 0)) then begin
-                            slNeedsDecalFlag.Add('Mesh is missing decal flag on BSLightingShaderProperty: ' + #9 + ShortName(stat) + #9 + model + #9 + mat + #9 + blockName);
+                            slNeedsDecalFlag.Add(model + #9 + IntToStr(i) + ' ' + block.BlockType + ': Added missing Decal shader flag.');
                             block.NativeValues['Shader Flags 1\Decal'] := 1;
                             bChanged := true;
                         end;
@@ -190,6 +231,18 @@ function TrimLeftChars(s: string; chars: integer): string;
 }
 begin
     Result := LeftStr(s, Length(s) - chars);
+end;
+
+function GetIsCleanDeleted(r: IwbMainRecord): Boolean;
+{
+    Checks to see if a reference has an XESP set to opposite of the PlayerRef
+}
+begin
+    Result := False;
+    if not ElementExists(r, 'XESP') then Exit;
+    if (GetElementNativeValues(r, 'XESP\Flags\Set Enable State to Opposite of Parent') = 0) then Exit;
+    if (GetElementEditValues(r, 'XESP\Reference') <> 'PlayerRef [PLYR:00000014]') then Exit;
+    Result := True;
 end;
 
 end.
