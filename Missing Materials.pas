@@ -4,7 +4,7 @@
 unit CheckSTATs;
 
 var
-    slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slContainers, slMaterialsToVerify: TStringList;
+    slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slContainers, slMaterialsToVerify, slModelsToCheck: TStringList;
     sOutputDir: string;
     joTextureMswpMap, joCustomMaterials: TJsonObject;
 
@@ -29,6 +29,7 @@ begin
     slContainers := TStringList.Create;
     slMaterialsToVerify := TStringList.Create;
     slMaterialsToVerify.Sorted := True;
+    slModelsToCheck := TStringList.Create;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
@@ -40,6 +41,7 @@ begin
             FilesInContainers(slContainers);
         end;
         CollectRecords;
+        CheckModels;
         ListStringsInStringList(slNifErrors);
         ListStringsInStringList(slMissingMaterials);
         ListStringsInStringList(slNeedsMaterials);
@@ -58,6 +60,7 @@ begin
         slMaterialsToVerify.Free;
         joTextureMswpMap.Free;
         joCustomMaterials.Free;
+        slModelsToCheck.Free;
     end;
 end;
 
@@ -94,8 +97,6 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgsm.EditValues['GrayscaleToPaletteColor'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Refraction'] := bgsm.EditValues['Refraction'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ScreenSpaceReflections'] := bgsm.EditValues['ScreenSpaceReflections'];
-                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := bgsm.EditValues['TileU'];
-                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := bgsm.EditValues['TileV'];
 
                     TileFlags := bgsm.NativeValues['TileFlags'];
                     if (TileFlags and 0) <> 0 then
@@ -237,9 +238,6 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMapping'] := bgem.EditValues['EnvironmentMapping'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := bgem.EditValues['EnvironmentMappingMaskScale'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgem.EditValues['GrayscaleToPaletteColor'];
-                    
-                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := bgem.EditValues['TileU'];
-                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := bgem.EditValues['TileV'];
 
                     TileFlags := bgem.NativeValues['TileFlags'];
                     if (TileFlags and 0) <> 0 then
@@ -344,9 +342,20 @@ begin
                 continue;
             end;
             if not IsEverPrecombined(r) then continue;
-            AddMessage(model);
-            NifNeedsMaterial(model, r);
+            
+            slModelsToCheck.Add(model);
         end;
+    end;
+end;
+
+procedure CheckModels;
+var
+    i: integer;
+    model: string;
+begin
+    for i := 0 to Pred(slModelsToCheck.Count) do begin
+        model := slModelsToCheck[i];
+        NifNeedsMaterial(model);
     end;
 end;
 
@@ -405,6 +414,7 @@ begin
     for m := 0 to Pred(count) do begin
         score := 0;
         mat := joTextureMswpMap.O[matType].O[diffuse].Names[m];
+        if not Assigned(Result) then Result := mat;
         for j := 0 to Pred(total) do begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
@@ -421,7 +431,7 @@ begin
             Result := mat;
         end;
     end;
-    //AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     if count > 1 then slMaterialsToVerify.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
@@ -451,7 +461,7 @@ begin
     end;
 end;
 
-function NifNeedsMaterial(model: string; stat: IwbElement): boolean;
+function NifNeedsMaterial(model: string): boolean;
 var
     i, count, NiAlphaPropFlags: integer;
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, clampMode, emit, emitColor, BackLightPower, BackLighting: string;
@@ -480,7 +490,7 @@ begin
                 joCustomMaterial := TJsonObject.Create;
                 try
                     if not (SameText(matExt, '.bgsm') or SameText(matExt, '.bgem')) then begin
-                        slNeedsMaterials.Add('Model may need a ' + block.BlockType + ' material: ' + #9 + ShortName(stat) + #9 + model + #9 + blockName);
+                        slNeedsMaterials.Add('Model may need a ' + block.BlockType + ' material: ' + #9 + model + #9 + blockName);
                         bBlockMissingMat := True;
                         Result := True;
                         if (block.BlockType = 'BSEffectShaderProperty') then begin
@@ -776,7 +786,7 @@ begin
                         if not ResourceExists(mat) then begin
                             bBlockMissingMat := True;
                             Result := True;
-                            slMissingMaterials.Add('Material does not exist: ' + #9 + ShortName(stat) + #9 + model + #9 + mat + #9 + blockName);
+                            slMissingMaterials.Add('Material does not exist: ' + #9 + model + #9 + mat + #9 + blockName);
                         end 
                         else if SameText(matExt, '.bgsm') then begin
                             bgsm.LoadFromResource(mat);
@@ -799,7 +809,7 @@ begin
             nif.Free;
             bgsm.Free;
         end;
-    // except on E: Exception do slNifErrors.Add('Error reading NIF: ' + E.Message + #9 + ShortName(stat) + #9 + model);
+    // except on E: Exception do slNifErrors.Add('Error reading NIF: ' + E.Message + #9 + model);
     // end;
 end;
 
