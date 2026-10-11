@@ -438,7 +438,7 @@ begin
     slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
 
-procedure IsCustomMaterialUnique(joCustomMaterial: TJsonObject; shader, diffuse, model: string);
+procedure IsCustomMaterialUnique(joCustomMaterial: TJsonObject; shader, diffuse, model, matPath: string);
 var
     i, j, count: integer;
     key: string;
@@ -451,6 +451,7 @@ begin
         for j := 0 to Pred(joCustomMaterials.O[shader].O[diffuse].O[i].Count) do begin
             key := joCustomMaterials.O[shader].O[diffuse].O[i].Names[j];
             if key = 'nifs' then continue;
+            if key = 'material' then continue;
             if not SameText(joCustomMaterials.O[shader].O[diffuse].O[i].S[key], joCustomMaterial.S[key])
             then materialsMatch := false;
         end;
@@ -458,8 +459,10 @@ begin
     end;
     if materialsMatch then begin
         joCustomMaterials.O[shader].O[diffuse].O[i].A['nifs'].Add(model);
+        joCustomMaterials.O[shader].O[diffuse].O[i].S['material'] := matPath;
     end else begin
         joCustomMaterials.O[shader].O[diffuse].O[count].Assign(joCustomMaterial);
+        joCustomMaterials.O[shader].O[diffuse].O[count].S['material'] := matPath;
     end;
 end;
 
@@ -574,7 +577,6 @@ begin
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(block.NativeValues['Shader Flags 2\Glow_Map']);
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['EffectLightingEnabled'] := IntToYesNo(block.NativeValues['Shader Flags 2\Effect_Lighting']);
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].A['nifs'].Add(model);
-                            IsCustomMaterialUnique(joCustomMaterial.O['bgem'].O[diffuse].O[count], matSuffix, diffuse, model);
 
 
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['DepthBias'] := block.EditValues['DepthBias'];
@@ -729,7 +731,7 @@ begin
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Tree'] := IntToYesNo(block.NativeValues['Shader Flags 2\Tree_Anim']);
 
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].A['nifs'].Add(model);
-                            IsCustomMaterialUnique(joCustomMaterial.O['bgsm'].O[diffuse].O[count], matSuffix, diffuse, model);
+                            
 
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['NonOccluder'] := block.EditValues['NonOccluder'];
 
@@ -780,7 +782,12 @@ begin
                         mess := model + #9 + IntToStr(i) + ' ' + block.BlockType + '\Name: Assigned material to "';
                         
                         matPath := PickMaterial(mess, model, matSuffix, diffuse, joCustomMaterial.O[matSuffix].O[diffuse].O[count]);
-                        if not Assigned(matPath) then continue;
+                        
+                        if not Assigned(matPath) then begin
+                            matPath := '';
+                            IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, matPath);
+                            continue;
+                        end else IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, matPath);
                         //matPath := 'materials' + TrimLeftChars(TrimRightChars(diffuse, 8), 6) + matSuffix;
                         //AddMessage('material path: ' + matPath);
                         block.EditValues['Name'] := matPath;
@@ -807,7 +814,7 @@ begin
         finally
             if bChanged then begin
                 EnsureDirectoryExists(sOutputDir + '\' + ExtractFilePath(model));
-                //nif.SaveToFile(sOutputDir + '\' + model);
+                nif.SaveToFile(sOutputDir + '\' + model);
             end;
             nif.Free;
             bgsm.Free;
