@@ -98,11 +98,11 @@ begin
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := bgsm.EditValues['TileV'];
 
                     TileFlags := bgsm.NativeValues['TileFlags'];
-                    if TileFlags and 0 then
+                    if (TileFlags and 0) <> 0 then
                         joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := 'yes'
                     else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := 'no';
 
-                    if TileFlags and 1 then
+                    if (TileFlags and 1) <> 0 then
                         joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'yes'
                     else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'no';
 
@@ -134,7 +134,7 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SkewSpecularAlpha'] := bgsm.EditValues['SkewSpecularAlpha'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SkinTint'] := bgsm.EditValues['SkinTint'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularEnabled'] := bgsm.EditValues['SpecularEnabled'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Terrain'] := bgsm.EditValues['Terrain'];
+                    
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Tessellate'] := bgsm.EditValues['Tessellate'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Tree'] := bgsm.EditValues['Tree'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EmittanceColor'] := bgsm.EditValues['EmittanceColor'];
@@ -172,7 +172,7 @@ begin
                     //perhaps unused
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WrinklesTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['WrinklesTexture'], resTexture));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnableEditorAlphaRef'] := bgsm.EditValues['EnableEditorAlphaRef'];
-
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Terrain'] := bgsm.EditValues['Terrain'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['SpecularTexture'], resTexture));
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DistanceFieldAlphaTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['DistanceFieldAlphaTexture'], resTexture));
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['FlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['FlowTexture'], resTexture));
@@ -241,11 +241,11 @@ begin
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := bgem.EditValues['TileV'];
 
                     TileFlags := bgem.NativeValues['TileFlags'];
-                    if TileFlags and 0 then
+                    if (TileFlags and 0) <> 0 then
                         joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := 'yes'
                     else joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := 'no';
 
-                    if TileFlags and 1 then
+                    if (TileFlags and 1) <> 0 then
                         joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := 'yes'
                     else joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := 'no';
 
@@ -678,7 +678,7 @@ begin
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['CastShadows'] := IntToYesNo(block.NativeValues['Shader Flags 1\Cast_Shadows']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Facegen'] := IntToYesNo(block.NativeValues['Shader Flags 1\Face']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['ModelSpaceNormals'] := IntToYesNo(block.NativeValues['Shader Flags 1\Model_Space_Normals']);
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Terrain'] := IntToYesNo(block.NativeValues['Shader Flags 1\Landscape']);
+                            // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Terrain'] := IntToYesNo(block.NativeValues['Shader Flags 1\Landscape']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Refraction'] := IntToYesNo(block.NativeValues['Shader Flags 1\Refraction']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EnvironmentMappingEye'] := IntToYesNo(block.NativeValues['Shader Flags 1\Eye_Environment_Mapping']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Hair'] := IntToYesNo(block.NativeValues['Shader Flags 1\Hair']);
