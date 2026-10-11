@@ -409,8 +409,8 @@ begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
             // try
-                if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
-                then score := score + 1;
+            if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
+            then score := score + 1;
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
             //     raise Exception.Create('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
@@ -421,7 +421,7 @@ begin
             Result := mat;
         end;
     end;
-    AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    //AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     if count > 1 then slMaterialsToVerify.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
@@ -766,7 +766,7 @@ begin
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TranslucencyTurbulence'] := block.EditValues['TranslucencyTurbulence'];
                         end;
                         mess := model + #9 + IntToStr(i) + ' ' + block.BlockType + '\Name: Assigned material to "';
-                        matPath := PickMaterial(mess, model, matSuffix, diffuse, joCustomMaterial);
+                        matPath := PickMaterial(mess, model, matSuffix, diffuse, joCustomMaterial.O[matSuffix].O[diffuse].O[count]);
                         if not Assigned(matPath) then continue;
                         //matPath := 'materials' + TrimLeftChars(TrimRightChars(diffuse, 8), 6) + matSuffix;
                         //AddMessage('material path: ' + matPath);
