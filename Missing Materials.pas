@@ -490,21 +490,19 @@ begin
                             count := joCustomMaterials.O['bgem'].O[diffuse].Count + 1;
 
                             AlphaPropEle := nif.Blocks[i - 1].Elements['Alpha Property'];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'no';
                             if Assigned(AlphaPropEle) then begin
                                 NiAlphaProp := AlphaPropEle.LinksTo;
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending
                                     if (NiAlphaPropFlags and 1) <> 0 then
-                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard'
-                                    else
-                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
                                     
                                     //Alpha Testing
                                     if (NiAlphaPropFlags and 2) <> 0 then
-                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'yes'
-                                    else
-                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'no';
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
 
                                     joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTestRef'] := NiAlphaProp.EditValues['Threshold'];
                                 end;
