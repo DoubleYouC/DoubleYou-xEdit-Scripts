@@ -375,7 +375,7 @@ begin
         score := 0
         mat := joTextureMswpMap.O[matType].O[diffuse].Names[m];
         for j := 0 to Pred(joCustomMaterial.Count) do begin
-            key := joCustomMaterial.Names[j]
+            key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
             if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
             then score := score + 1;
@@ -400,7 +400,7 @@ begin
     for i := 0 to Pred(count) do begin
         materialsMatch := true;
         for j := 0 to Pred(joCustomMaterials.O[shader].O[diffuse].O[i].Count) do begin
-            key := joCustomMaterials.O[shader].O[diffuse].O[i].Names[j]
+            key := joCustomMaterials.O[shader].O[diffuse].O[i].Names[j];
             if key = 'nifs' then continue;
             if not SameText(joCustomMaterials.O[shader].O[diffuse].O[i].S[key], joCustomMaterial.S[key])
             then materialsMatch := false;
