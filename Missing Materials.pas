@@ -421,7 +421,7 @@ begin
             Result := mat;
         end;
     end;
-
+    AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     if count > 1 then slMaterialsToVerify.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
@@ -496,13 +496,22 @@ begin
                                 NiAlphaProp := AlphaPropEle.LinksTo;
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
-                                    //Alpha Blending
+                                    //Alpha Blending 4333
                                     if (NiAlphaPropFlags and 1) <> 0 then
                                         joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
                                     
-                                    //Alpha Testing
+                                    //Alpha Testing 4844
                                     if (NiAlphaPropFlags and 2) <> 0 then
                                         joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+
+                                    //Alpha Blending and Testing Additive 4845
+                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 2) <> 0) then
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+
+                                    //Alpha Blending Multiplicative 4137
+                                    //Alpha Blending    Source Blend Mode: Dst Color    Alpha Test Function: Greater
+                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 8) <> 0) and ((NiAlphaPropFlags and 4096) <> 0) then
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
 
                                     joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTestRef'] := NiAlphaProp.EditValues['Threshold'];
                                 end;
@@ -604,15 +613,22 @@ begin
                                 NiAlphaProp := AlphaPropEle.LinksTo;
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
-                                    //Alpha Blending
+                                    //Alpha Blending 4333
                                     if (NiAlphaPropFlags and 1) <> 0 then
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
                                     
-                                    //Alpha Testing
+                                    //Alpha Testing 4844
                                     if (NiAlphaPropFlags and 2) <> 0 then
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
 
-                                    joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTestRef'] := NiAlphaProp.EditValues['Threshold'];
+                                    //Alpha Blending and Testing Additive 4845
+                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 2) <> 0) then
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+
+                                    //Alpha Blending Multiplicative 4137
+                                    //Alpha Blending    Source Blend Mode: Dst Color    Alpha Test Function: Greater
+                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 8) <> 0) and ((NiAlphaPropFlags and 4096) <> 0) then
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
                                 end;
                             end;
 
