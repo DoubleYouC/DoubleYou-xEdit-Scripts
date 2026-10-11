@@ -408,12 +408,13 @@ begin
         for j := 0 to Pred(total) do begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
-            try
+            // try
                 if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
-            except
-                AddMessage('Error: ' + diffuse + #9 + key + #9);
-            end;
-            then score := score + 1;
+                then score := score + 1;
+            // except on E: Exception do
+            //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
+            //     raise Exception.Create('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
+            // end;
         end;
         if score > bestScore then begin
             bestScore := score;
@@ -599,21 +600,19 @@ begin
                             count := joCustomMaterials.O['bgsm'].O[diffuse].Count + 1;
 
                             AlphaPropEle := nif.Blocks[i - 1].Elements['Alpha Property'];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'no';
                             if Assigned(AlphaPropEle) then begin
                                 NiAlphaProp := AlphaPropEle.LinksTo;
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending
                                     if (NiAlphaPropFlags and 1) <> 0 then
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard'
-                                    else
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
+                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
                                     
                                     //Alpha Testing
                                     if (NiAlphaPropFlags and 2) <> 0 then
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'yes'
-                                    else
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'no';
+                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
 
                                     joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTestRef'] := NiAlphaProp.EditValues['Threshold'];
                                 end;
