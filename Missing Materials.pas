@@ -67,7 +67,7 @@ procedure FilesInContainers(containers: TStringList);
 }
 var
     slArchivedFiles: TStringList;
-    i: integer;
+    i, TileFlags: integer;
     f, ext, diffuse: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
@@ -94,8 +94,18 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgsm.EditValues['GrayscaleToPaletteColor'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Refraction'] := bgsm.EditValues['Refraction'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ScreenSpaceReflections'] := bgsm.EditValues['ScreenSpaceReflections'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := bgsm.EditValues['TileU'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := bgsm.EditValues['TileV'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := bgsm.EditValues['TileU'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := bgsm.EditValues['TileV'];
+
+                    TileFlags := bgsm.NativeValues['TileFlags'];
+                    if TileFlags and 0 then
+                        joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := 'yes'
+                    else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := 'no';
+
+                    if TileFlags and 1 then
+                        joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'yes'
+                    else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'no';
+
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TwoSided'] := bgsm.EditValues['TwoSided'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgsm.EditValues['WetnessControl_ScreenSpaceReflections'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ZBufferTest'] := bgsm.EditValues['ZBufferTest'];
@@ -137,12 +147,12 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Smoothness'] := bgsm.EditValues['Smoothness'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularMult'] := bgsm.EditValues['SpecularMult'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SubsurfaceLightingRolloff'] := bgsm.EditValues['SubsurfaceLightingRolloff'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_EnvMapScale'] := bgsm.EditValues['WetnessControl_EnvMapScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_FresnelPower'] := bgsm.EditValues['WetnessControl_FresnelPower'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_Metalness'] := bgsm.EditValues['WetnessControl_Metalness'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecMinvar'] := bgsm.EditValues['WetnessControl_SpecMinvar'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecPowerScale'] := bgsm.EditValues['WetnessControl_SpecPowerScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecScale'] := bgsm.EditValues['WetnessControl_SpecScale'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_EnvMapScale'] := bgsm.EditValues['WetnessControlEnvMapScale'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_FresnelPower'] := bgsm.EditValues['WetnessControlFresnelPower'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_Metalness'] := bgsm.EditValues['WetnessControlMetalness'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecMinvar'] := bgsm.EditValues['WetnessControlSpecMinvar'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecPowerScale'] := bgsm.EditValues['WetnessControlSpecPowerScale'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecScale'] := bgsm.EditValues['WetnessControlSpecScale'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RootMaterialPath'] := bgsm.EditValues['RootMaterialPath'];
 
                     //no nif equivalent it would seem
@@ -151,55 +161,56 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['HairTintColor'] := bgsm.EditValues['HairTintColor'];
 
                     //textures
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['NormalTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['GlowTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GreyscaleTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['GreyscaleTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['DisplacementTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['EnvmapTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['InnerLayerTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SmoothSpecTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['SmoothSpecTexture'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Glow'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GreyscaleTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Grayscale'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Displacement'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\InnerLayer'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SmoothSpecTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\SmoothSpec'], resTexture));
 
                     //perhaps unused
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['SpecularTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DistanceFieldAlphaTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['DistanceFieldAlphaTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['FlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['FlowTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['LightingTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['LightingTexture'], resTexture));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WrinklesTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['WrinklesTexture'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DepthBias'] := bgsm.EditValues['DepthBias'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskAlbedo'] := bgsm.EditValues['WriteMaskAlbedo'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskAmbientOcclusion'] := bgsm.EditValues['WriteMaskAmbientOcclusion'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskEmissive'] := bgsm.EditValues['WriteMaskEmissive'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskGloss'] := bgsm.EditValues['WriteMaskGloss'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskNormal'] := bgsm.EditValues['WriteMaskNormal'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskSpecular'] := bgsm.EditValues['WriteMaskSpecular'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnableEditorAlphaRef'] := bgsm.EditValues['EnableEditorAlphaRef'];
+
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['SpecularTexture'], resTexture));
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DistanceFieldAlphaTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['DistanceFieldAlphaTexture'], resTexture));
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['FlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['FlowTexture'], resTexture));
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['LightingTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['LightingTexture'], resTexture));
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DepthBias'] := bgsm.EditValues['DepthBias'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskAlbedo'] := bgsm.EditValues['WriteMaskAlbedo'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskAmbientOcclusion'] := bgsm.EditValues['WriteMaskAmbientOcclusion'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskEmissive'] := bgsm.EditValues['WriteMaskEmissive'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskGloss'] := bgsm.EditValues['WriteMaskGloss'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskNormal'] := bgsm.EditValues['WriteMaskNormal'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WriteMaskSpecular'] := bgsm.EditValues['WriteMaskSpecular'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RefractionFalloff'] := bgsm.EditValues['RefractionFalloff'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AssumeShadowmask'] := bgsm.EditValues['AssumeShadowmask'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['CustomPorosity'] := bgsm.EditValues['CustomPorosity'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['CustomPorosity'] := bgsm.EditValues['CustomPorosity'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DissolveFade'] := bgsm.EditValues['DissolveFade'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnableEditorAlphaRef'] := bgsm.EditValues['EnableEditorAlphaRef'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingWindow'] := bgsm.EditValues['EnvironmentMappingWindow'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['PBR'] := bgsm.EditValues['PBR'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingWindow'] := bgsm.EditValues['EnvironmentMappingWindow'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['PBR'] := bgsm.EditValues['PBR'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ReceiveShadows'] := bgsm.EditValues['ReceiveShadows'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Translucency'] := bgsm.EditValues['Translucency'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyMixAlbedoWithSubsurfaceColor'] := bgsm.EditValues['TranslucencyMixAlbedoWithSubsurfaceColor'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyThickObject'] := bgsm.EditValues['TranslucencyThickObject'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencySubsurfaceColor'] := bgsm.EditValues['TranslucencySubsurfaceColor'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['UseAdaptativeEmissive'] := bgsm.EditValues['UseAdaptativeEmissive'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AdaptativeEmissive_ExposureOffset'] := bgsm.EditValues['AdaptativeEmissive_ExposureOffset'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMax'] := bgsm.EditValues['AdaptativeEmissive_FinalExposureMax'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMin'] := bgsm.EditValues['AdaptativeEmissive_FinalExposureMin'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Translucency'] := bgsm.EditValues['Translucency'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyMixAlbedoWithSubsurfaceColor'] := bgsm.EditValues['TranslucencyMixAlbedoWithSubsurfaceColor'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyThickObject'] := bgsm.EditValues['TranslucencyThickObject'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencySubsurfaceColor'] := bgsm.EditValues['TranslucencySubsurfaceColor'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['UseAdaptativeEmissive'] := bgsm.EditValues['UseAdaptativeEmissive'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AdaptativeEmissive_ExposureOffset'] := bgsm.EditValues['AdaptativeEmissive_ExposureOffset'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMax'] := bgsm.EditValues['AdaptativeEmissive_FinalExposureMax'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMin'] := bgsm.EditValues['AdaptativeEmissive_FinalExposureMin'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTextureBias'] := bgsm.EditValues['DisplacementTextureBias'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTextureScale'] := bgsm.EditValues['DisplacementTextureScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['LumEmittance'] := bgsm.EditValues['LumEmittance'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['PorosityValue'] := bgsm.EditValues['PorosityValue'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TerrainRotationAngle'] := bgsm.EditValues['TerrainRotationAngle'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TerrainThresholdFalloff'] := bgsm.EditValues['TerrainThresholdFalloff'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TerrainTilingDistance'] := bgsm.EditValues['TerrainTilingDistance'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['LumEmittance'] := bgsm.EditValues['LumEmittance'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['PorosityValue'] := bgsm.EditValues['PorosityValue'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TerrainRotationAngle'] := bgsm.EditValues['TerrainRotationAngle'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TerrainThresholdFalloff'] := bgsm.EditValues['TerrainThresholdFalloff'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TerrainTilingDistance'] := bgsm.EditValues['TerrainTilingDistance'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TessellationBaseFactor'] := bgsm.EditValues['TessellationBaseFactor'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TessellationFadeDistance'] := bgsm.EditValues['TessellationFadeDistance'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TessellationPnScale'] := bgsm.EditValues['TessellationPnScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTransmissiveScale'] := bgsm.EditValues['TranslucencyTransmissiveScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTurbulence'] := bgsm.EditValues['TranslucencyTurbulence'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTransmissiveScale'] := bgsm.EditValues['TranslucencyTransmissiveScale'];
+                    // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTurbulence'] := bgsm.EditValues['TranslucencyTurbulence'];
                 finally
                     bgsm.Free;
                 end;
@@ -209,28 +220,39 @@ begin
                 try
                     bgem.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Base'], resTexture));
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AlphaTest'] := bgem.EditValues['AlphaTest'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Decal'] := bgem.EditValues['Decal'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['DecalNoFade'] := bgem.EditValues['DecalNoFade'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMapping'] := bgem.EditValues['EnvironmentMapping'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgem.EditValues['GrayscaleToPaletteColor'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Refraction'] := bgem.EditValues['Refraction'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := bgem.EditValues['TileU'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := bgem.EditValues['TileV'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TwoSided'] := bgem.EditValues['TwoSided'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['ZBufferTest'] := bgem.EditValues['ZBufferTest'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['ZBufferWrite'] := bgem.EditValues['ZBufferWrite'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['UOffset'] := bgem.EditValues['UOffset'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['VOffset'] := bgem.EditValues['VOffset'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['UScale'] := bgem.EditValues['UScale'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['VScale'] := bgem.EditValues['VScale'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AlphaBlendMode'] := bgem.EditValues['AlphaBlendMode'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AlphaTestRef'] := bgem.EditValues['AlphaTestRef'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AlphaTest'] := bgem.EditValues['AlphaTest'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['ZBufferTest'] := bgem.EditValues['ZBufferTest'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['ZBufferWrite'] := bgem.EditValues['ZBufferWrite'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Decal'] := bgem.EditValues['Decal'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TwoSided'] := bgem.EditValues['TwoSided'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['DecalNoFade'] := bgem.EditValues['DecalNoFade'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Refraction'] := bgem.EditValues['Refraction'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMapping'] := bgem.EditValues['EnvironmentMapping'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := bgem.EditValues['EnvironmentMappingMaskScale'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['UOffset'] := bgem.EditValues['UOffset'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['UScale'] := bgem.EditValues['UScale'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['VOffset'] := bgem.EditValues['VOffset'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['VScale'] := bgem.EditValues['VScale'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgem.EditValues['GrayscaleToPaletteColor'];
+                    
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := bgem.EditValues['TileU'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := bgem.EditValues['TileV'];
+
+                    TileFlags := bgem.NativeValues['TileFlags'];
+                    if TileFlags and 0 then
+                        joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := 'yes'
+                    else joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := 'no';
+
+                    if TileFlags and 1 then
+                        joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := 'yes'
+                    else joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := 'no';
+
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EffectLightingEnabled'] := bgem.EditValues['EffectLightingEnabled'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['FalloffColorEnabled'] := bgem.EditValues['FalloffColorEnabled'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['FalloffEnabled'] := bgem.EditValues['FalloffEnabled'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Glowmap'] := bgem.EditValues['Glowmap'];
+                    
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteAlpha'] := bgem.EditValues['GrayscaleToPaletteAlpha'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SoftEnabled'] := bgem.EditValues['SoftEnabled'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['BaseColor'] := bgem.EditValues['BaseColor'];
@@ -243,43 +265,44 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SoftDepth'] := bgem.EditValues['SoftDepth'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMinLOD'] := bgem.EditValues['EnvmapMinLOD'];
 
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMaskTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['EnvmapMaskTexture'], resTexture));
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['EnvmapTexture'], resTexture));
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['GrayscaleTexture'], resTexture));
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['NormalTexture'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMaskTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\EnvmapMask'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Envmap'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Grayscale'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Normal'], resTexture));
 
                     //no nif equivalent it would seem
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Alpha'] := bgem.EditValues['Alpha'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NonOccluder'] := bgem.EditValues['NonOccluder'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['ScreenSpaceReflections'] := bgem.EditValues['ScreenSpaceReflections'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgem.EditValues['WetnessControl_ScreenSpaceReflections'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Alpha'] := bgem.EditValues['Alpha'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgem.EditValues['WetnessControlScreenSpaceReflections'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['BloodEnabled'] := bgem.EditValues['BloodEnabled'];
 
-                    //perhaps unused
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['DepthBias'] := bgem.EditValues['DepthBias'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskAlbedo'] := bgem.EditValues['WriteMaskAlbedo'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskAmbientOcclusion'] := bgem.EditValues['WriteMaskAmbientOcclusion'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskEmissive'] := bgem.EditValues['WriteMaskEmissive'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskGloss'] := bgem.EditValues['WriteMaskGloss'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskNormal'] := bgem.EditValues['WriteMaskNormal'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskSpecular'] := bgem.EditValues['WriteMaskSpecular'];
+                    // unused
+                    //joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Glowmap'] := bgem.EditValues['Glowmap'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['RefractionFalloff'] := bgem.EditValues['RefractionFalloff'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['RefractionPower'] := bgem.EditValues['RefractionPower'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['BloodEnabled'] := bgem.EditValues['BloodEnabled'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EffectPbrSpecular'] := bgem.EditValues['EffectPbrSpecular'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassEnabled'] := bgem.EditValues['GlassEnabled'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EmittanceColor'] := bgem.EditValues['EmittanceColor'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassFresnelColor'] := bgem.EditValues['GlassFresnelColor'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AdaptativeEmissive_ExposureOffset'] := bgem.EditValues['AdaptativeEmissive_ExposureOffset'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMax'] := bgem.EditValues['AdaptativeEmissive_FinalExposureMax'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMin'] := bgem.EditValues['AdaptativeEmissive_FinalExposureMin'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassBlurScaleBase'] := bgem.EditValues['GlassBlurScaleBase'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassBlurScaleFactor'] := bgem.EditValues['GlassBlurScaleFactor'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassRefractionScaleBase'] := bgem.EditValues['GlassRefractionScaleBase'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassDirtOverlay'] := bgem.EditValues['GlassDirtOverlay'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassRoughnessScratch'] := bgem.EditValues['GlassRoughnessScratch'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlowTexture'] := bgem.EditValues['GlowTexture'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingTexture'] := bgem.EditValues['LightingTexture'];
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SpecularTexture'] := bgem.EditValues['SpecularTexture'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['DepthBias'] := bgem.EditValues['DepthBias'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskAlbedo'] := bgem.EditValues['WriteMaskAlbedo'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskAmbientOcclusion'] := bgem.EditValues['WriteMaskAmbientOcclusion'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskEmissive'] := bgem.EditValues['WriteMaskEmissive'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskGloss'] := bgem.EditValues['WriteMaskGloss'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskNormal'] := bgem.EditValues['WriteMaskNormal'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WriteMaskSpecular'] := bgem.EditValues['WriteMaskSpecular'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EffectPbrSpecular'] := bgem.EditValues['EffectPbrSpecular'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassEnabled'] := bgem.EditValues['GlassEnabled'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EmittanceColor'] := bgem.EditValues['EmittanceColor'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassFresnelColor'] := bgem.EditValues['GlassFresnelColor'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AdaptativeEmissive_ExposureOffset'] := bgem.EditValues['AdaptativeEmissive_ExposureOffset'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMax'] := bgem.EditValues['AdaptativeEmissive_FinalExposureMax'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['AdaptativeEmissive_FinalExposureMin'] := bgem.EditValues['AdaptativeEmissive_FinalExposureMin'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassBlurScaleBase'] := bgem.EditValues['GlassBlurScaleBase'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassBlurScaleFactor'] := bgem.EditValues['GlassBlurScaleFactor'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassRefractionScaleBase'] := bgem.EditValues['GlassRefractionScaleBase'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassDirtOverlay'] := bgem.EditValues['GlassDirtOverlay'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlassRoughnessScratch'] := bgem.EditValues['GlassRoughnessScratch'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GlowTexture'] := bgem.EditValues['GlowTexture'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingTexture'] := bgem.EditValues['Textures\Lighting'];
+                    // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SpecularTexture'] := bgem.EditValues['Textures\Specular'];
                 finally
                     bgem.Free;
                 end;
@@ -368,7 +391,7 @@ end;
 
 function PickMaterial(mess, model, matType, diffuse: string; joCustomMaterial: TJsonObject): string;
 var
-    j, m, count, score, bestScore: integer;
+    j, m, count, score, bestScore, total: integer;
     mat, key: string;
     joBestMatch: TJsonObject;
 begin
@@ -377,10 +400,11 @@ begin
     count := joTextureMswpMap.O[matType].O[diffuse].Count;
 
     bestScore := 0;
+    total := joCustomMaterial.Count;
     for m := 0 to Pred(count) do begin
         score := 0
         mat := joTextureMswpMap.O[matType].O[diffuse].Names[m];
-        for j := 0 to Pred(joCustomMaterial.Count) do begin
+        for j := 0 to Pred(total) do begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
             if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
@@ -392,7 +416,8 @@ begin
         end;
     end;
 
-    if count > 1 then slMaterialsToVerify.Add(mess + mat + '"');
+    if count > 1 then slMaterialsToVerify.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
 
 procedure IsCustomMaterialUnique(joCustomMaterial: TJsonObject; shader, diffuse, model: string);
@@ -416,7 +441,7 @@ begin
     if materialsMatch then begin
         joCustomMaterials.O[shader].O[diffuse].O[i].A['nifs'].Add(model);
     end else begin
-        joCustomMaterials.O[shader].O[diffuse].O[count + 1].Assign(joCustomMaterial);
+        joCustomMaterials.O[shader].O[diffuse].O[count].Assign(joCustomMaterial);
     end;
 end;
 
@@ -425,6 +450,7 @@ var
     i, count, NiAlphaPropFlags: integer;
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, clampMode, emit, emitColor, BackLightPower, BackLighting: string;
     bBlockMissingMat, bChanged: boolean;
+    emitMult: double;
 
     nif: TwbNifFile;
     block, TextureSet, NiAlphaProp: TwbNifBlock;
@@ -464,13 +490,13 @@ begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending
                                     if (NiAlphaPropFlags and 1) <> 0 then
-                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard'
                                     else
                                         joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
                                     
                                     //Alpha Testing
                                     if (NiAlphaPropFlags and 2) <> 0 then
-                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'yes'
                                     else
                                         joCustomMaterial.O['bgem'].O[diffuse].O[count].S['AlphaTest'] := 'no';
 
@@ -485,10 +511,10 @@ begin
                             
                             clampMode := block.EditValues['Texture Clamp Mode'];
                             if ContainsText(clampMode, 'WRAP_S') then
-                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileU'] := 'yes';
+                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileU'] := 'yes'
                             else joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileU'] := 'no';
                             if ContainsText(clampMode, 'WRAP_T') then
-                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'yes';
+                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'yes'
                             else joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'no';
 
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColor'] := block.EditValues['Base Color'];
@@ -574,13 +600,13 @@ begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending
                                     if (NiAlphaPropFlags and 1) <> 0 then
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard'
                                     else
                                         joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
                                     
                                     //Alpha Testing
                                     if (NiAlphaPropFlags and 2) <> 0 then
-                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'yes'
                                     else
                                         joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AlphaTest'] := 'no';
 
@@ -595,16 +621,16 @@ begin
                             
                             clampMode := block.EditValues['Texture Clamp Mode'];
                             if ContainsText(clampMode, 'WRAP_S') then
-                                joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TileU'] := 'yes';
+                                joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TileU'] := 'yes'
                             else joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TileU'] := 'no';
                             if ContainsText(clampMode, 'WRAP_T') then
-                                joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TileV'] := 'yes';
+                                joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TileV'] := 'yes'
                             else joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TileV'] := 'no';
 
                             emitColor := block.EditValues['Emissive Color'];
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EmittanceColor'] := emitColor;
-                            emitMult := block.NativeValues['Emissive Multiple'];
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EmittanceMult'] := emitMult;
+                            //emitMult := block.NativeValues['Emissive Multiple'];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EmittanceMult'] := block.EditValues['Emissive Multiple'];
                             emit := IntToYesNo(block.NativeValues['Shader Flags 1\Own_Emit']);
                             // if emit = 'yes' then begin
                             //     if emitColor = '#000000' then emit := 'no';
@@ -727,7 +753,6 @@ begin
                         //AddMessage('material path: ' + matPath);
                         block.EditValues['Name'] := matPath;
                         bChanged := true;
-                        slAddedMat.Add(mess + matPath + '"');
                     end else begin
                         if not ResourceExists(mat) then begin
                             bBlockMissingMat := True;
