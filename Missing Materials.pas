@@ -154,6 +154,7 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecPowerScale'] := bgsm.EditValues['WetnessControlSpecPowerScale'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecScale'] := bgsm.EditValues['WetnessControlSpecScale'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RootMaterialPath'] := bgsm.EditValues['RootMaterialPath'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DissolveFade'] := bgsm.EditValues['DissolveFade'];
 
                     //no nif equivalent it would seem
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NonOccluder'] := bgsm.EditValues['NonOccluder'];
@@ -187,7 +188,7 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RefractionFalloff'] := bgsm.EditValues['RefractionFalloff'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AssumeShadowmask'] := bgsm.EditValues['AssumeShadowmask'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['CustomPorosity'] := bgsm.EditValues['CustomPorosity'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DissolveFade'] := bgsm.EditValues['DissolveFade'];
+                    
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingWindow'] := bgsm.EditValues['EnvironmentMappingWindow'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['PBR'] := bgsm.EditValues['PBR'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ReceiveShadows'] := bgsm.EditValues['ReceiveShadows'];
@@ -407,7 +408,11 @@ begin
         for j := 0 to Pred(total) do begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
-            if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
+            try
+                if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
+            except
+                AddMessage('Error: ' + diffuse + #9 + key + #9);
+            end;
             then score := score + 1;
         end;
         if score > bestScore then begin
@@ -681,6 +686,7 @@ begin
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Terrain'] := IntToYesNo(block.NativeValues['Shader Flags 1\Landscape']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Refraction'] := IntToYesNo(block.NativeValues['Shader Flags 1\Refraction']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EnvironmentMappingEye'] := IntToYesNo(block.NativeValues['Shader Flags 1\Eye_Environment_Mapping']);
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['DissolveFade'] := IntToYesNo(block.NativeValues['Shader Flags 1\Screendoor_Alpha_Fade']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Hair'] := IntToYesNo(block.NativeValues['Shader Flags 1\Hair']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['HideSecret'] := IntToYesNo(block.NativeValues['Shader Flags 1\Localmap_Hide_Secret']);
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['SkinTint'] := IntToYesNo(block.NativeValues['Shader Flags 1\Skin_Tint']);
@@ -718,7 +724,7 @@ begin
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['RefractionFalloff'] := block.EditValues['RefractionFalloff'];
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['AssumeShadowmask'] := block.EditValues['AssumeShadowmask'];
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['CustomPorosity'] := block.EditValues['CustomPorosity'];
-                            // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['DissolveFade'] := block.EditValues['DissolveFade'];
+                            
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EnableEditorAlphaRef'] := block.EditValues['EnableEditorAlphaRef'];
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EnvironmentMappingWindow'] := block.EditValues['EnvironmentMappingWindow'];
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['PBR'] := block.EditValues['PBR'];
