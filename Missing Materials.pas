@@ -34,8 +34,11 @@ begin
     joCustomMaterials := TJsonObject.Create;
     try
         sOutputDir :=  wbScriptsPath + 'FixModels\output';
-        ResourceContainerList(slContainers);
-        FilesInContainers(slContainers);
+
+        if not FileExists(sOutputDir + '\joTextureMswpMap.json') then begin
+            ResourceContainerList(slContainers);
+            FilesInContainers(slContainers);
+        end;
         CollectRecords;
         ListStringsInStringList(slNifErrors);
         ListStringsInStringList(slMissingMaterials);
@@ -80,6 +83,7 @@ begin
             ext := ExtractFileExt(f);
             if SameText(ext, '.bgsm') then begin
                 bgsm := TwbBGSMFile.Create;
+                AddMessage(f);
                 try
                     bgsm.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Diffuse'], resTexture));
@@ -201,6 +205,7 @@ begin
                 end;
             end else if SameText(ext, '.bgem') then begin
                 bgem := TwbBGEMFile.Create;
+                AddMessage(f);
                 try
                     bgem.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Base'], resTexture));
@@ -315,6 +320,7 @@ begin
                 continue;
             end;
             if not IsEverPrecombined(r) then continue;
+            AddMessage(model);
             NifNeedsMaterial(model, r);
         end;
     end;
@@ -455,7 +461,6 @@ begin
                             if Assigned(AlphaPropEle) then begin
                                 NiAlphaProp := AlphaPropEle.LinksTo;
                                 if Assigned(NiAlphaProp) then begin
-                                    alpha := 'yes';
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending
                                     if (NiAlphaPropFlags and 1) <> 0 then
@@ -566,7 +571,6 @@ begin
                             if Assigned(AlphaPropEle) then begin
                                 NiAlphaProp := AlphaPropEle.LinksTo;
                                 if Assigned(NiAlphaProp) then begin
-                                    alpha := 'yes';
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending
                                     if (NiAlphaPropFlags and 1) <> 0 then
