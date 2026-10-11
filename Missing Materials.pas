@@ -39,9 +39,11 @@ begin
         if not FileExists(sOutputDir + '\joTextureMswpMap.json') then begin
             ResourceContainerList(slContainers);
             FilesInContainers(slContainers);
+        end else begin
+            joTextureMswpMap.LoadFromFile(sOutputDir + '\joTextureMswpMap.json');
         end;
         CollectRecords;
-        CheckModels;
+        //CheckModels;
         ListStringsInStringList(slNifErrors);
         ListStringsInStringList(slMissingMaterials);
         ListStringsInStringList(slNeedsMaterials);
@@ -99,11 +101,11 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ScreenSpaceReflections'] := bgsm.EditValues['ScreenSpaceReflections'];
 
                     TileFlags := bgsm.NativeValues['TileFlags'];
-                    if (TileFlags and 0) <> 0 then
+                    if (TileFlags and 1) <> 0 then
                         joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := 'yes'
                     else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileV'] := 'no';
 
-                    if (TileFlags and 1) <> 0 then
+                    if (TileFlags and 2) <> 0 then
                         joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'yes'
                     else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'no';
 
@@ -240,11 +242,11 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgem.EditValues['GrayscaleToPaletteColor'];
 
                     TileFlags := bgem.NativeValues['TileFlags'];
-                    if (TileFlags and 0) <> 0 then
+                    if (TileFlags and 1) <> 0 then
                         joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := 'yes'
                     else joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileV'] := 'no';
 
-                    if (TileFlags and 1) <> 0 then
+                    if (TileFlags and 2) <> 0 then
                         joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := 'yes'
                     else joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileU'] := 'no';
 
@@ -341,7 +343,8 @@ begin
                 AddMessage('Warning: STAT references a model that does not seem to exist: ' + ShortName(r) + #9 + model);
                 continue;
             end;
-            if not IsEverPrecombined(r) then continue;
+            if not IsEverUsed(r) then continue;
+            NifNeedsMaterial(model);
             
             slModelsToCheck.Add(model);
         end;
@@ -359,7 +362,7 @@ begin
     end;
 end;
 
-function IsEverPrecombined(s: IwbMainRecord): boolean;
+function IsEverUsed(s: IwbMainRecord): boolean;
 var
     i: integer;
     r: IwbMainRecord;
@@ -408,7 +411,6 @@ begin
     Result := nil;
     if not joTextureMswpMap.O[matType].Contains(diffuse) then Exit;
     count := joTextureMswpMap.O[matType].O[diffuse].Count;
-
     bestScore := 0;
     total := joCustomMaterial.Count;
     for m := 0 to Pred(count) do begin
@@ -419,7 +421,7 @@ begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
             // try
-            if SameText(joTextureMswpMap.O[matType].O[diffuse].S[key], joCustomMaterial.S[key])
+            if joTextureMswpMap.O[matType].O[diffuse].S[key] = joCustomMaterial.S[key]
             then score := score + 1;
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
@@ -464,9 +466,9 @@ end;
 function NifNeedsMaterial(model: string): boolean;
 var
     i, count, NiAlphaPropFlags: integer;
-    mat, matExt, blockName, diffuse, matPath, matSuffix, mess, clampMode, emit, emitColor, BackLightPower, BackLighting: string;
+    mat, matExt, blockName, diffuse, matPath, matSuffix, mess, clampMode, emit, emitColor, BackLighting: string;
     bBlockMissingMat, bChanged: boolean;
-    emitMult: double;
+    emitMult, BackLightPower: double;
 
     nif: TwbNifFile;
     block, TextureSet, NiAlphaProp: TwbNifBlock;
@@ -527,10 +529,10 @@ begin
                                 end;
                             end;
 
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UOffset'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Offset'], ' ')[0], 0));
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VOffset'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Offset'], ' ')[1], 0));
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UScale'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Scale'], ' ')[0], 1));
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VScale'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Scale'], ' ')[1], 1));
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[0];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[1];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UScale'] := SplitString(block.EditValues['UV Scale'], ' ')[0];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VScale'] := SplitString(block.EditValues['UV Scale'], ' ')[1];
                             
                             clampMode := block.EditValues['Texture Clamp Mode'];
                             if ContainsText(clampMode, 'WRAP_S') then
@@ -642,10 +644,10 @@ begin
                                 end;
                             end;
 
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UOffset'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Offset'], ' ')[0], 0));
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VOffset'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Offset'], ' ')[1], 0));
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UScale'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Scale'], ' ')[0], 1));
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VScale'] := FloatToStr(StrToFloatDef(SplitString(block.EditValues['UV Scale'], ' ')[1], 1));
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[0];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[1];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UScale'] := SplitString(block.EditValues['UV Scale'], ' ')[0];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VScale'] := SplitString(block.EditValues['UV Scale'], ' ')[1];
                             
                             clampMode := block.EditValues['Texture Clamp Mode'];
                             if ContainsText(clampMode, 'WRAP_S') then
@@ -676,7 +678,7 @@ begin
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['RimPower'] := block.EditValues['Rimlight Power'];
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['RimLighting'] := IntToYesNo(block.NativeValues['Shader Flags 1\Character_Lighting']);
                             BackLightPower := block.NativeValues['Backlight Power'];
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['BackLightPower'] := BackLightPower;
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['BackLightPower'] := block.EditValues['Backlight Power'];
                             if BackLightPower > 0 then BackLighting := 'yes' else BackLighting := 'no';
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['BackLighting'] := BackLighting;
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['GrayscaleToPaletteScale'] := block.EditValues['Grayscale To Palette Scale'];
@@ -776,6 +778,7 @@ begin
                             // joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['TranslucencyTurbulence'] := block.EditValues['TranslucencyTurbulence'];
                         end;
                         mess := model + #9 + IntToStr(i) + ' ' + block.BlockType + '\Name: Assigned material to "';
+                        
                         matPath := PickMaterial(mess, model, matSuffix, diffuse, joCustomMaterial.O[matSuffix].O[diffuse].O[count]);
                         if not Assigned(matPath) then continue;
                         //matPath := 'materials' + TrimLeftChars(TrimRightChars(diffuse, 8), 6) + matSuffix;
