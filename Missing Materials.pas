@@ -107,7 +107,7 @@ begin
                     else joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileU'] := 'no';
 
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TwoSided'] := bgsm.EditValues['TwoSided'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgsm.EditValues['WetnessControl_ScreenSpaceReflections'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgsm.EditValues['WetnessControlScreenSpaceReflections'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ZBufferTest'] := bgsm.EditValues['ZBufferTest'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ZBufferWrite'] := bgsm.EditValues['ZBufferWrite'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AlphaBlendMode'] := bgsm.EditValues['AlphaBlendMode'];
@@ -402,7 +402,7 @@ begin
     bestScore := 0;
     total := joCustomMaterial.Count;
     for m := 0 to Pred(count) do begin
-        score := 0
+        score := 0;
         mat := joTextureMswpMap.O[matType].O[diffuse].Names[m];
         for j := 0 to Pred(total) do begin
             key := joCustomMaterial.Names[j];
