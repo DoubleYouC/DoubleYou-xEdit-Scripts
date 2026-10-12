@@ -405,7 +405,7 @@ end;
 function PickMaterial(mess, model, matType, diffuse: string; joCustomMaterial: TJsonObject): string;
 var
     j, m, count, score, bestScore, total: integer;
-    mat, key: string;
+    mat, key, x, y: string;
     joBestMatch: TJsonObject;
 begin
     Result := nil;
@@ -421,8 +421,11 @@ begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
             // try
-            if joTextureMswpMap.O[matType].O[diffuse].S[key] = joCustomMaterial.S[key]
+            x := joTextureMswpMap.O[matType].O[diffuse].O[mat].S[key];
+            y := joCustomMaterial.S[key];
+            if x = y
             then score := score + 1;
+            //AddMessage(x + #9 + y + #9 + BoolToStr(x = y))
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
             //     raise Exception.Create('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
@@ -469,10 +472,11 @@ end;
 function NifNeedsMaterial(model: string): boolean;
 var
     i, count, NiAlphaPropFlags: integer;
-    mat, matExt, blockName, diffuse, matPath, matSuffix, mess, clampMode, emit, emitColor, BackLighting: string;
+    mat, matExt, blockName, diffuse, matPath, matSuffix, mess, clampMode, emit, emitColor, BackLighting, uv: string;
     bBlockMissingMat, bChanged: boolean;
     emitMult, BackLightPower: double;
 
+    tsUV: TStrings;
     nif: TwbNifFile;
     block, TextureSet, NiAlphaProp: TwbNifBlock;
     bgsm: TwbBGSMFile;
@@ -532,10 +536,14 @@ begin
                                 end;
                             end;
 
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[0];
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[1];
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UScale'] := SplitString(block.EditValues['UV Scale'], ' ')[0];
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VScale'] := SplitString(block.EditValues['UV Scale'], ' ')[1];
+                            uv := block.EditValues['UV Offset'];
+                            tsUV := SplitString(uv, ' ');
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UOffset'] := tsUV[0];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VOffset'] := tsUV[1];
+                            uv := block.EditValues['UV Scale'];
+                            tsUV := SplitString(uv, ' ');
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['UScale'] := tsUV[0];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['VScale'] := tsUV[1];
                             
                             clampMode := block.EditValues['Texture Clamp Mode'];
                             if ContainsText(clampMode, 'WRAP_S') then
@@ -646,10 +654,14 @@ begin
                                 end;
                             end;
 
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[0];
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VOffset'] := SplitString(block.EditValues['UV Offset'], ' ')[1];
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UScale'] := SplitString(block.EditValues['UV Scale'], ' ')[0];
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VScale'] := SplitString(block.EditValues['UV Scale'], ' ')[1];
+                            uv := block.EditValues['UV Offset'];
+                            tsUV := SplitString(uv, ' ');
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UOffset'] := tsUV[0];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VOffset'] := tsUV[1];
+                            uv := block.EditValues['UV Scale'];
+                            tsUV := SplitString(uv, ' ');
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['UScale'] := tsUV[0];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['VScale'] := tsUV[1];
                             
                             clampMode := block.EditValues['Texture Clamp Mode'];
                             if ContainsText(clampMode, 'WRAP_S') then
@@ -867,7 +879,7 @@ end;
 
 function IntToYesNo(i: integer): string;
 begin
-    if i = 0 then Result := 'yes' else Result := 'no';
+    if i <> 0 then Result := 'yes' else Result := 'no';
 end;
 
 function GetIsCleanDeleted(r: IwbMainRecord): Boolean;
@@ -880,6 +892,14 @@ begin
     if (GetElementNativeValues(r, 'XESP\Flags\Set Enable State to Opposite of Parent') = 0) then Exit;
     if (GetElementEditValues(r, 'XESP\Reference') <> 'PlayerRef [PLYR:00000014]') then Exit;
     Result := True;
+end;
+
+function BoolToStr(b: boolean): string;
+{
+    Given a boolean, return a string.
+}
+begin
+    if b then Result := 'true' else Result := 'false';
 end;
 
 end.
