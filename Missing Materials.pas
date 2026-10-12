@@ -481,7 +481,7 @@ var
 
     tsUV: TStrings;
     nif: TwbNifFile;
-    block, TextureSet, NiAlphaProp: TwbNifBlock;
+    block, TextureSet, NiAlphaProp, controllerLink: TwbNifBlock;
     bgsm: TwbBGSMFile;
     Textures, TextureSetEle, AlphaPropEle, controller: TdfElement;
     joCustomMaterial: TJsonObject;
@@ -510,7 +510,10 @@ begin
                             diffuse := LowerCase(wbNormalizeResourceName(block.EditValues['Source Texture'], resTexture));
                             if diffuse = '' then continue;
                             controller := block.Elements['Controller'];
-                            if Assigned(controller) then continue;
+                            if Assigned(controller) then begin
+                                controllerLink := controller.LinksTo;
+                                if Assigned(controllerLink) then continue;
+                            end;
 
                             count := joCustomMaterials.O['bgem'].O[diffuse].Count + 1;
 
@@ -632,7 +635,10 @@ begin
                             diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             if diffuse = '' then continue;
                             controller := block.Elements['Controller'];
-                            if Assigned(controller) then continue;
+                            if Assigned(controller) then begin
+                                controllerLink := controller.LinksTo;
+                                if Assigned(controllerLink) then continue;
+                            end;
 
                             count := joCustomMaterials.O['bgsm'].O[diffuse].Count + 1;
 
