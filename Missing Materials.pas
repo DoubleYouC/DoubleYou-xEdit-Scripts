@@ -413,11 +413,11 @@ begin
     count := joTextureMswpMap.O[matType].O[diffuse].Count;
     bestScore := 0;
     total := joCustomMaterial.Count;
-    for m := 0 to Pred(count) do begin
+    for m := Pred(count) downto 0 do begin
         score := 0;
         mat := joTextureMswpMap.O[matType].O[diffuse].Names[m];
         if not Assigned(Result) then Result := mat;
-        for j := 0 to Pred(total) do begin
+        for j := Pred(total) downto 0 do begin
             key := joCustomMaterial.Names[j];
             if key = 'nifs' then continue;
             // try
@@ -427,7 +427,7 @@ begin
             then score := score + 1
             else if (key = 'TwoSided') and (y = 'yes') then score := -100
             else if (key = 'Decal') and (y = 'yes') then score := -100
-            else if pos(key, 'UOffset,VOffset,UScale,VScale,AlphaTest,GrayscaleToPaletteColor') > 0 then score := -100;
+            else if pos(key, 'UOffset,VOffset,UScale,VScale,AlphaTest,GrayscaleToPaletteColor,Glowmap') > 0 then score := -100;
             //AddMessage(x + #9 + y + #9 + BoolToStr(x = y))
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
@@ -483,7 +483,7 @@ var
     nif: TwbNifFile;
     block, TextureSet, NiAlphaProp: TwbNifBlock;
     bgsm: TwbBGSMFile;
-    Textures, TextureSetEle, AlphaPropEle: TdfElement;
+    Textures, TextureSetEle, AlphaPropEle, controller: TdfElement;
     joCustomMaterial: TJsonObject;
 begin
     Result := False;
@@ -509,6 +509,9 @@ begin
                             matSuffix := 'bgem';
                             diffuse := LowerCase(wbNormalizeResourceName(block.EditValues['Source Texture'], resTexture));
                             if diffuse = '' then continue;
+                            controller := block.Elements['Controller'];
+                            if Assigned(controller) then continue;
+
                             count := joCustomMaterials.O['bgem'].O[diffuse].Count + 1;
 
                             AlphaPropEle := nif.Blocks[i - 1].Elements['Alpha Property'];
@@ -585,7 +588,7 @@ begin
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['ZBufferWrite'] := IntToYesNo(block.NativeValues['Shader Flags 2\ZBuffer_Write']);
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['DecalNoFade'] := IntToYesNo(block.NativeValues['Shader Flags 2\No_Fade']);
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TwoSided'] :=IntToYesNo(block.NativeValues['Shader Flags 2\Double_Sided']);
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(block.NativeValues['Shader Flags 2\Glow_Map']);
+                            //joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(block.NativeValues['Shader Flags 2\Glow_Map']);
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['EffectLightingEnabled'] := IntToYesNo(block.NativeValues['Shader Flags 2\Effect_Lighting']);
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].A['nifs'].Add(model);
 
@@ -628,6 +631,8 @@ begin
                             Textures := TextureSet.Elements['Textures'];
                             diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             if diffuse = '' then continue;
+                            controller := block.Elements['Controller'];
+                            if Assigned(controller) then continue;
 
                             count := joCustomMaterials.O['bgsm'].O[diffuse].Count + 1;
 
