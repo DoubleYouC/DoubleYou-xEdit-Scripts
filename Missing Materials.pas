@@ -424,7 +424,10 @@ begin
             x := joTextureMswpMap.O[matType].O[diffuse].O[mat].S[key];
             y := joCustomMaterial.S[key];
             if x = y
-            then score := score + 1;
+            then score := score + 1
+            else if (key = 'TwoSided') and (y = 'yes') then score := -100
+            else if (key = 'Decal') and (y = 'yes') then score := -100
+            else if pos(key, 'UOffset,VOffset,UScale,VScale,AlphaTest,GrayscaleToPaletteColor') > 0 then score := -100;
             //AddMessage(x + #9 + y + #9 + BoolToStr(x = y))
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
@@ -436,9 +439,9 @@ begin
             Result := mat;
         end;
     end;
-    AddMessage(mess + mat + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
-    if count > 1 then slMaterialsToVerify.Add(mess + mat + '"' + #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
-    slAddedMat.Add(mess + mat + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    AddMessage(mess + Result + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    if count > 1 then slMaterialsToVerify.Add(mess + Result + '"' + #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    slAddedMat.Add(mess + Result + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
 
 procedure IsCustomMaterialUnique(joCustomMaterial: TJsonObject; shader, diffuse, model, matPath: string);
