@@ -114,7 +114,7 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ZBufferTest'] := bgsm.EditValues['ZBufferTest'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ZBufferWrite'] := bgsm.EditValues['ZBufferWrite'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AlphaBlendMode'] := bgsm.EditValues['AlphaBlendMode'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Alpha'] := bgsm.EditValues['Alpha'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Alpha'] := FloatToStr(StrToFloatDef(bgsm.EditValues['Alpha'],1));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AlphaTestRef'] := bgsm.EditValues['AlphaTestRef'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := bgsm.EditValues['EnvironmentMappingMaskScale'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RefractionPower'] := bgsm.EditValues['RefractionPower'];
@@ -257,6 +257,7 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteAlpha'] := bgem.EditValues['GrayscaleToPaletteAlpha'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SoftEnabled'] := bgem.EditValues['SoftEnabled'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['BaseColor'] := bgem.EditValues['BaseColor'];
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Alpha'] := FloatToStr(StrToFloatDef(bgem.EditValues['Alpha'],1));
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['BaseColorScale'] := bgem.EditValues['BaseColorScale'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['FalloffStartAngle'] := bgem.EditValues['FalloffStartAngle'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['FalloffStartOpacity'] := bgem.EditValues['FalloffStartOpacity'];
@@ -272,7 +273,6 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Normal'], resTexture));
 
                     //no nif equivalent it would seem
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Alpha'] := bgem.EditValues['Alpha'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NonOccluder'] := bgem.EditValues['NonOccluder'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['ScreenSpaceReflections'] := bgem.EditValues['ScreenSpaceReflections'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgem.EditValues['WetnessControlScreenSpaceReflections'];
@@ -566,8 +566,14 @@ begin
                                 joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'yes'
                             else joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'no';
 
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColor'] := block.EditValues['Emissive Color'];
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Alpha'] := block.EditValues['Alpha'];
+                            emitColor := block.EditValues['Emissive Color'];
+                            if LeftStr(emitColor, 1) = '#' then begin
+                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColor'] := LeftStr(emitColor, 7);
+                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToInt('$' + RightStr(emitColor, 2)) / 255.0);
+                            end else begin
+                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColor'] := '#' + StringReplace(LeftStr(emitColor, 8), ' ', '', [rfIgnoreCase]);
+                                joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToFloatDef(RightStr(emitColor, 8),1));
+                            end;
 
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['LightingInfluence'] := block.EditValues['Lighting Influence'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['EnvmapMinLOD'] := block.EditValues['Env Map Min LOD'];
@@ -702,7 +708,7 @@ begin
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['EmitEnabled'] := emit;
                             
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['RootMaterialPath'] := block.EditValues['Root Material'];
-                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Alpha'] := block.EditValues['Alpha'];
+                            joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToFloatDef(block.EditValues['Alpha'],1));
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['RefractionPower'] := block.EditValues['Refraction Strength'];
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['Smoothness'] := block.EditValues['Smoothness'];
                             joCustomMaterial.O['bgsm'].O[diffuse].O[count].S['SpecularColor'] := block.EditValues['Specular Color'];
