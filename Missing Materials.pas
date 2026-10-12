@@ -427,7 +427,7 @@ begin
             then score := score + 1
             else if (key = 'TwoSided') and (y = 'yes') then score := -100
             else if (key = 'Decal') and (y = 'yes') then score := -100
-            else if pos(key, 'UOffset,VOffset,UScale,VScale,AlphaTest,GrayscaleToPaletteColor,Glowmap') > 0 then score := -100;
+            else if pos(key, 'UOffset,VOffset,UScale,VScale,AlphaTest,GrayscaleToPaletteColor,Glowmap,Alpha,BaseColor') > 0 then score := -100;
             //AddMessage(x + #9 + y + #9 + BoolToStr(x = y))
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
@@ -566,7 +566,8 @@ begin
                                 joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'yes'
                             else joCustomMaterial.O['bgem'].O[diffuse].O[count].S['TileV'] := 'no';
 
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColor'] := block.EditValues['Base Color'];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColor'] := block.EditValues['Emissive Color'];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Alpha'] := block.EditValues['Alpha'];
 
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['LightingInfluence'] := block.EditValues['Lighting Influence'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['EnvmapMinLOD'] := block.EditValues['Env Map Min LOD'];
@@ -574,9 +575,9 @@ begin
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['FalloffStopAngle'] := block.EditValues['Falloff Stop Angle'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['FalloffStartOpacity'] := block.EditValues['Falloff Start Opacity'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['FalloffStopOpacity'] := block.EditValues['Falloff Stop Opacity'];
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColorScale'] := block.EditValues['Base Color Scale'];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BaseColorScale'] := block.EditValues['Emissive Multiple'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['SoftDepth'] := block.EditValues['Soft Falloff Depth'];
-                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['GrayscaleTexture'] := block.EditValues['Greyscale Texture'];
+                            joCustomMaterial.O['bgem'].O[diffuse].O[count].S['GrayscaleTexture'] := block.EditValues['Grayscale Texture'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['EnvmapTexture'] := block.EditValues['Env Map Texture'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['NormalTexture'] := block.EditValues['Normal Texture'];
                             joCustomMaterial.O['bgem'].O[diffuse].O[count].S['EnvmapMaskTexture'] := block.EditValues['Env Mask Texture'];
@@ -610,7 +611,7 @@ begin
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['WriteMaskGloss'] := block.EditValues['WriteMaskGloss'];
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['WriteMaskNormal'] := block.EditValues['WriteMaskNormal'];
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['WriteMaskSpecular'] := block.EditValues['WriteMaskSpecular'];
-                            // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['Alpha'] := block.EditValues['Alpha'];
+                            
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['RefractionFalloff'] := block.EditValues['RefractionFalloff'];
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['RefractionPower'] := block.EditValues['RefractionPower'];
                             // joCustomMaterial.O['bgem'].O[diffuse].O[count].S['BloodEnabled'] := block.EditValues['BloodEnabled'];
