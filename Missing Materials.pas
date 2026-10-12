@@ -436,9 +436,9 @@ begin
             Result := mat;
         end;
     end;
-    AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    AddMessage(mess + mat + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     if count > 1 then slMaterialsToVerify.Add(mess + mat + '"' + #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
-    slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    slAddedMat.Add(mess + mat + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
 
 procedure IsCustomMaterialUnique(joCustomMaterial: TJsonObject; shader, diffuse, model, matPath: string);
