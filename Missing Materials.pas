@@ -437,7 +437,7 @@ begin
         end;
     end;
     AddMessage(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
-    if count > 1 then slMaterialsToVerify.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    if count > 1 then slMaterialsToVerify.Add(mess + mat + '"' + #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     slAddedMat.Add(mess + mat + '" Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
 
