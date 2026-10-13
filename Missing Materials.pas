@@ -742,6 +742,9 @@ begin
             for i := 0 to Pred(nif.BlocksCount) do begin
                 bHasShaderProperty := false;
                 bHasAlpha := false;
+                shaderProp := nil;
+                NiAlphaProp := nil;
+                TextureSet := nil;
                 diffuse := '';
                 block := nif.Blocks[i];
 
@@ -926,8 +929,14 @@ begin
                             if not Assigned(TextureSetEle) then continue;
                             TextureSet := TextureSetEle.LinksTo;
                             if not Assigned(TextureSet) then continue;
-                            Textures := TextureSet.Elements['Textures']; 
+                            if TextureSet.BlockType <> 'BSShaderTextureSet' then continue;
+                            Textures := TextureSet.Elements['Textures'];
+                            try
                                 diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
+                            except on E: Exception do
+                                AddMessage('Error: ' + E.Message);
+                                continue;
+                            end;
                             if diffuse = '' then continue;
                             controller := shaderProp.Elements['Controller'];
                             if Assigned(controller) then begin
