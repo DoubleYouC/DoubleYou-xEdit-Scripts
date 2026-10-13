@@ -81,9 +81,9 @@ procedure FilesInContainers(containers: TStringList);
 }
 var
     slArchivedFiles: TStringList;
-    i: integer;
+    i, TileFlags: integer;
     f, ext, diffuse, EnvironmentMappingMaskScale, EnvironmentMapping, SpecularMult, SpecularColor, SpecularEnabled,
-    RimLighting, RimPower, EmitEnabled, EmittanceColor, EmittanceMult, BackLighting, BackLightPower, Refraction, 
+    RimLighting, RimPower, EmitEnabled, EmittanceColor, EmittanceMult, BackLighting, BackLightPower, Refraction,
     RefractionPower, GrayscaleToPaletteColor, GrayscaleTexture, GrayscaleToPaletteScale, EnvmapTexture, SmoothSpecTexture: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
@@ -109,7 +109,7 @@ begin
                     EnvironmentMappingMaskScale := bgsm.EditValues['EnvironmentMappingMaskScale'];
                     if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
                     if (EnvmapTexture <> '') and (EnvironmentMapping = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
-                    if EnvmapTexture = '' then EnvironmentMapping := 'no'
+                    if EnvmapTexture = '' then EnvironmentMapping := 'no';
                     if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
@@ -178,11 +178,21 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularColor'] := bgsm.EditValues['SpecularColor'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SpecularMult'] := bgsm.EditValues['SpecularMult'];
 
+                    TileFlags := bgsm.NativeValues['TileFlags'];
+                    if ((TileFlags and 1) <> 0) and ((TileFlags and 2) <> 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 3
+                    else if ((TileFlags and 1) = 0) and ((TileFlags and 2) = 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 0
+                    else if ((TileFlags and 1) <> 0) and ((TileFlags and 2) = 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 1
+                    else if ((TileFlags and 1) = 0) and ((TileFlags and 2) <> 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 2;
+
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AlphaTest'] := bgsm.EditValues['AlphaTest'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Decal'] := bgsm.EditValues['Decal'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DecalNoFade'] := bgsm.EditValues['DecalNoFade'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ScreenSpaceReflections'] := bgsm.EditValues['ScreenSpaceReflections'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := bgsm.EditValues['TileFlags'];
+                    
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TwoSided'] := bgsm.EditValues['TwoSided'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_ScreenSpaceReflections'] := bgsm.EditValues['WetnessControlScreenSpaceReflections'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ZBufferTest'] := bgsm.EditValues['ZBufferTest'];
@@ -304,7 +314,7 @@ begin
                     EnvironmentMappingMaskScale := bgem.EditValues['EnvironmentMappingMaskScale'];
                     if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
                     if (EnvmapTexture <> '') and (EnvironmentMapping = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
-                    if EnvmapTexture = '' then EnvironmentMapping := 'no'
+                    if EnvmapTexture = '' then EnvironmentMapping := 'no';
                     if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
@@ -312,7 +322,15 @@ begin
 
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgem.EditValues['GrayscaleToPaletteColor'];
 
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := bgsm.EditValues['TileFlags'];
+                    TileFlags := bgsm.NativeValues['TileFlags'];
+                    if ((TileFlags and 1) <> 0) and ((TileFlags and 2) <> 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 3
+                    else if ((TileFlags and 1) = 0) and ((TileFlags and 2) = 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 0
+                    else if ((TileFlags and 1) <> 0) and ((TileFlags and 2) = 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 1
+                    else if ((TileFlags and 1) = 0) and ((TileFlags and 2) <> 0)
+                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 2;
 
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EffectLightingEnabled'] := bgem.EditValues['EffectLightingEnabled'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['FalloffColorEnabled'] := bgem.EditValues['FalloffColorEnabled'];
