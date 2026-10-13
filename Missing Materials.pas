@@ -4,7 +4,8 @@
 unit CheckSTATs;
 
 var
-    slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded: TStringList;
+    slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, 
+    slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded: TStringList;
     sOutputDir: string;
     joTextureMswpMap, joCustomMaterials: TJsonObject;
 
@@ -32,6 +33,8 @@ begin
     slModelsToCheck := TStringList.Create;
     slMaterialsAdded := TStringList.Create;
     slMaterialsAdded.Sorted := True;
+    slMaterialWarnings := TStringList.Create;
+    slMaterialWarnings.Sorted := True;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
@@ -47,6 +50,7 @@ begin
         CollectRecords;
         //CheckModels;
         ListStringsInStringList(slNifErrors);
+        ListStringsInStringList(slMaterialWarnings);
         ListStringsInStringList(slMissingMaterials);
         ListStringsInStringList(slNeedsMaterials);
         ListStringsInStringList(slAddedMat);
@@ -67,6 +71,7 @@ begin
         joCustomMaterials.Free;
         slModelsToCheck.Free;
         slMaterialsAdded.Free;
+        slMaterialWarnings.Free;
     end;
 end;
 
@@ -79,7 +84,7 @@ var
     i: integer;
     f, ext, diffuse, EnvironmentMappingMaskScale, EnvironmentMapping, SpecularMult, SpecularColor, SpecularEnabled,
     RimLighting, RimPower, EmitEnabled, EmittanceColor, EmittanceMult, BackLighting, BackLightPower, Refraction, 
-    RefractionPower, GrayscaleToPaletteColor, GrayscaleTexture, GrayscaleToPaletteScale: string;
+    RefractionPower, GrayscaleToPaletteColor, GrayscaleTexture, GrayscaleToPaletteScale, EnvmapTexture, SmoothSpecTexture: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
 begin
@@ -99,8 +104,12 @@ begin
                     bgsm.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Diffuse'], resTexture));
 
+                    EnvmapTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
                     EnvironmentMapping := bgsm.EditValues['EnvironmentMapping'];
                     EnvironmentMappingMaskScale := bgsm.EditValues['EnvironmentMappingMaskScale'];
+                    if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
+                    if (EnvmapTexture <> '') and (EnvironmentMapping = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
+                    if EnvmapTexture = '' then EnvironmentMapping := 'no'
                     if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
@@ -109,6 +118,7 @@ begin
                     GrayscaleToPaletteColor := bgsm.EditValues['GrayscaleToPaletteColor'];
                     GrayscaleTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Grayscale'], resTexture));
                     GrayscaleToPaletteScale := bgsm.EditValues['GrayscaleToPaletteScale'];
+                    if (GrayscaleTexture = '') and (GrayscaleToPaletteColor = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses grayscale to palette but does not have a palette!');
                     if GrayscaleToPaletteColor = 'yes' then if GrayscaleTexture = '' then GrayscaleToPaletteColor := 'no';
                     if GrayscaleToPaletteColor = 'no' then GrayscaleToPaletteScale := '0.000000';
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := GrayscaleToPaletteColor;
@@ -153,6 +163,9 @@ begin
                     SpecularEnabled := bgsm.EditValues['SpecularEnabled'];
                     SpecularColor := bgsm.EditValues['SpecularColor'];
                     SpecularMult := bgsm.EditValues['SpecularMult'];
+                    SmoothSpecTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\SmoothSpec'], resTexture));
+                    if (SmoothSpecTexture = '') and (SpecularEnabled = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses specular but does not have a specular texture!');
+                    if (SmoothSpecTexture <> '') and (SpecularEnabled = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a specular texture but does not use specular!');
                     if SpecularEnabled = 'yes' then begin
                         // if SpecularColor = '#000000' then SpecularEnabled := 'no';
                         if SpecularMult = '0.000000' then SpecularEnabled := 'no';
@@ -216,9 +229,10 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Glow'], resTexture));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GrayscaleTexture'] := GrayscaleTexture;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Displacement'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvmapTexture'] := EnvmapTexture;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\InnerLayer'], resTexture));
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SmoothSpecTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\SmoothSpec'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SmoothSpecTexture'] := SmoothSpecTexture;
+
 
                     //perhaps unused
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WrinklesTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['WrinklesTexture'], resTexture));
@@ -285,8 +299,12 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['DecalNoFade'] := bgem.EditValues['DecalNoFade'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Refraction'] := bgem.EditValues['Refraction'];
 
+                    EnvmapTexture := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Envmap'], resTexture));
                     EnvironmentMapping := bgem.EditValues['EnvironmentMapping'];
                     EnvironmentMappingMaskScale := bgem.EditValues['EnvironmentMappingMaskScale'];
+                    if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
+                    if (EnvmapTexture <> '') and (EnvironmentMapping = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
+                    if EnvmapTexture = '' then EnvironmentMapping := 'no'
                     if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
@@ -327,7 +345,7 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMinLOD'] := bgem.EditValues['EnvmapMinLOD'];
 
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMaskTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\EnvmapMask'], resTexture));
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Envmap'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapTexture'] := EnvmapTexture;
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Grayscale'], resTexture));
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Normal'], resTexture));
 
