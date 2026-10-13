@@ -773,7 +773,7 @@ begin
                 AddMessage(model + #9 + blocknamehere);
                 joCustomMaterial := TJsonObject.Create;
                 try
-                    if (not (SameText(matExt, matSuffix))) or (not ResourceExists(mat)) then begin
+                    if (not (SameText(matExt, '.' + matSuffix))) or (not ResourceExists(mat)) then begin
                         slNeedsMaterials.Add('Model may need a ' + shaderProp.BlockType + ' material: ' + #9 + model + #9 + blockName);
                         bBlockMissingMat := True;
                         Result := True;
