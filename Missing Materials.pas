@@ -322,15 +322,15 @@ begin
 
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleToPaletteColor'] := bgem.EditValues['GrayscaleToPaletteColor'];
 
-                    TileFlags := bgsm.NativeValues['TileFlags'];
+                    TileFlags := bgem.NativeValues['TileFlags'];
                     if ((TileFlags and 1) <> 0) and ((TileFlags and 2) <> 0)
-                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 3
+                    then joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileFlags'] := 3
                     else if ((TileFlags and 1) = 0) and ((TileFlags and 2) = 0)
-                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 0
+                    then joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileFlags'] := 0
                     else if ((TileFlags and 1) <> 0) and ((TileFlags and 2) = 0)
-                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 1
+                    then joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileFlags'] := 1
                     else if ((TileFlags and 1) = 0) and ((TileFlags and 2) <> 0)
-                    then joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TileFlags'] := 2;
+                    then joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['TileFlags'] := 2;
 
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EffectLightingEnabled'] := bgem.EditValues['EffectLightingEnabled'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['FalloffColorEnabled'] := bgem.EditValues['FalloffColorEnabled'];
