@@ -720,7 +720,7 @@ end;
 
 function NifNeedsMaterial(model: string): boolean;
 var
-    i, p, count, NiAlphaPropFlags: integer;
+    i, count, NiAlphaPropFlags: integer;
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, emit, emitColor, 
     BackLighting, uv, blocknamehere, clampMode, emitMult, BackLightPower, RefractionPower,
     GrayscaleToPaletteColor, RimPower, RimLighting, SpecularEnabled, SpecularMult, SpecularColor, Refraction,
@@ -750,21 +750,22 @@ begin
                 if Assigned(NiAlphaProp) then bHasAlpha := true;
 
                 ShaderPropEle := block.Elements['Shader Property'];
-                if Assigned(ShaderPropEle) then
-                shaderProp := ShaderPropEle.LinksTo;
+                if Assigned(ShaderPropEle)
+                then shaderProp := ShaderPropEle.LinksTo
+                else continue;
                 if Assigned(shaderProp) then begin
                     bHasShaderProperty := true;
                     if shaderProp.BlockType = 'BSLightingShaderProperty' then matSuffix := 'bgsm'
                     else if shaderProp.BlockType = 'BSEffectShaderProperty' then matSuffix := 'bgem'
                     else bHasShaderProperty := false;
-                end;
+                end else continue;
 
                 if not bHasShaderProperty then continue;
                 blockName := block.EditValues['Name'];
 
                 mat := wbNormalizeResourceName(shaderProp.EditValues['Name'], resMaterial);
                 matExt := ExtractFileExt(mat);
-                blocknamehere := IntToStr(i) + ' ' + shaderProp.BlockType;
+                blocknamehere := IntToStr(i) + ' ' + block.BlockType + '\' + shaderProp.BlockType;
                 joCustomMaterial := TJsonObject.Create;
                 try
                     if (not (SameText(matExt, matSuffix))) or (not ResourceExists(mat)) then begin
