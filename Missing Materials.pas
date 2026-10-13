@@ -819,7 +819,7 @@ begin
                             EnvironmentMapping := IntToYesNo(block.NativeValues['Shader Flags 1\Environment_Mapping']);
                             EnvironmentMappingMaskScale := block.EditValues['Environment Map Scale'];
                             if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
-                            if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping = 'no';
+                            if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMapping'] := EnvironmentMapping;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
 
@@ -943,8 +943,8 @@ begin
                                 if emitMult = '0.000000' then emit := 'no';
                             end;
                             if emit = 'no' then begin
-                                emitColor = '#000000';
-                                emitMult = '0.000000';
+                                emitColor := '#000000';
+                                emitMult := '0.000000';
                             end;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EmitEnabled'] := emit;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EmittanceMult'] := emitMult;
@@ -994,7 +994,7 @@ begin
                             EnvironmentMapping := IntToYesNo(block.NativeValues['Shader Flags 1\Environment_Mapping']);
                             EnvironmentMappingMaskScale := block.EditValues['Environment Map Scale'];
                             if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
-                            if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping = 'no';
+                            if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMapping'] := EnvironmentMapping;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
                             
