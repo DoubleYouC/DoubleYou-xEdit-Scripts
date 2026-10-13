@@ -47,12 +47,12 @@ begin
         end else begin
             joTextureMswpMap.LoadFromFile(sOutputDir + '\joTextureMswpMap.json');
         end;
+        ListStringsInStringList(slMaterialWarnings);
         CollectRecords;
         //CheckModels;
         ListStringsInStringList(slNifErrors);
-        ListStringsInStringList(slMaterialWarnings);
         ListStringsInStringList(slMissingMaterials);
-        ListStringsInStringList(slNeedsMaterials);
+        // ListStringsInStringList(slNeedsMaterials);
         ListStringsInStringList(slAddedMat);
         ListStringsInStringList(slNeedsDecalFlag);
         ListStringsInStringList(slMaterialsToVerify);
@@ -252,7 +252,7 @@ begin
                     //textures
                     NormalTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NormalTexture'] := NormalTexture;
-                    if (NormalTexture <> '') and (NormalTexture <> 'textures\effects\colornormalspecutility.dds') and ((not SameText(RightStr(NormalTexture, 6), '_n.dds')) or (not SameText(RightStr(NormalTexture, 8), '_msn.dds')))
+                    if (NormalTexture <> '') and (NormalTexture <> 'textures\effects\colornormalspecutility.dds') and (not SameText(RightStr(NormalTexture, 6), '_n.dds'))
                     then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a normal texture that does not use the _n suffix:' + #9 + NormalTexture);
                     if NormalTexture = '' then begin
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_n.dds';
@@ -742,6 +742,7 @@ begin
             for i := 0 to Pred(nif.BlocksCount) do begin
                 bHasShaderProperty := false;
                 bHasAlpha := false;
+                diffuse := '';
                 block := nif.Blocks[i];
 
                 AlphaPropEle := block.Elements['Alpha Property'];
@@ -766,6 +767,7 @@ begin
                 mat := wbNormalizeResourceName(shaderProp.EditValues['Name'], resMaterial);
                 matExt := ExtractFileExt(mat);
                 blocknamehere := IntToStr(i) + ' ' + block.BlockType + '\' + shaderProp.BlockType;
+                AddMessage(model + #9 + blocknamehere);
                 joCustomMaterial := TJsonObject.Create;
                 try
                     if (not (SameText(matExt, matSuffix))) or (not ResourceExists(mat)) then begin
@@ -924,8 +926,8 @@ begin
                             if not Assigned(TextureSetEle) then continue;
                             TextureSet := TextureSetEle.LinksTo;
                             if not Assigned(TextureSet) then continue;
-                            Textures := TextureSet.Elements['Textures'];
-                            diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
+                            Textures := TextureSet.Elements['Textures']; 
+                                diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             if diffuse = '' then continue;
                             controller := shaderProp.Elements['Controller'];
                             if Assigned(controller) then begin
