@@ -662,7 +662,9 @@ begin
             else if (key = 'VOffset') then score := -100
             else if (key = 'UScale') then score := -100
             else if (key = 'VScale') then score := -100
-            else if (key = 'AlphaTest') and (y = 'yes') then score := -100
+            else if (key = 'AlphaTest') then score := -100
+            else if (key = 'Alpha') then score := -100
+            else if (key = 'AlphaBlend') then score := -100
             else if (key = 'GrayscaleToPaletteColor') then score := -100
             else if (key = 'Glowmap') then score := -100
             else if (key = 'BaseColor') then score := -100
@@ -718,17 +720,17 @@ end;
 
 function NifNeedsMaterial(model: string): boolean;
 var
-    i, count, NiAlphaPropFlags: integer;
+    i, p, count, NiAlphaPropFlags: integer;
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, emit, emitColor, 
     BackLighting, uv, blocknamehere, clampMode, emitMult, BackLightPower, RefractionPower,
     GrayscaleToPaletteColor, RimPower, RimLighting, SpecularEnabled, SpecularMult, SpecularColor, Refraction,
     FalloffEnabled, SoftEnabled, EnvironmentMapping, EnvironmentMappingMaskScale: string;
-    bBlockMissingMat, bChanged: boolean;
+    bBlockMissingMat, bChanged, bHasShaderProperty, bHasAlpha: boolean;
 
     tsUV: TStrings;
     nif: TwbNifFile;
-    block, TextureSet, NiAlphaProp, controllerLink: TwbNifBlock;
-    Textures, TextureSetEle, AlphaPropEle, controller: TdfElement;
+    block, TextureSet, NiAlphaProp, controllerLink, prop, shaderProp: TwbNifBlock;
+    Textures, TextureSetEle, AlphaPropEle, ShaderPropEle, controller: TdfElement;
     joCustomMaterial: TJsonObject;
 begin
     Result := False;
@@ -738,23 +740,41 @@ begin
         try
             nif.LoadFromResource(model);
             for i := 0 to Pred(nif.BlocksCount) do begin
+                bHasShaderProperty := false;
+                bHasAlpha := false;
                 block := nif.Blocks[i];
-                if ((block.BlockType = 'BSTrishape') or (block.BlockType = 'BSMeshLODTriShape')) then blockName := block.EditValues['Name'];
-                if not ((block.BlockType = 'BSLightingShaderProperty') or (block.BlockType = 'BSEffectShaderProperty')) then continue;
-                mat := wbNormalizeResourceName(block.EditValues['Name'], resMaterial);
+
+                AlphaPropEle := block.Elements['Alpha Property'];
+                if Assigned(AlphaPropEle) then
+                NiAlphaProp := AlphaPropEle.LinksTo;
+                if Assigned(NiAlphaProp) then bHasAlpha := true;
+
+                ShaderPropEle := block.Elements['Shader Property'];
+                if Assigned(ShaderPropEle) then
+                shaderProp := ShaderPropEle.LinksTo;
+                if Assigned(shaderProp) then begin
+                    bHasShaderProperty := true;
+                    if shaderProp.BlockType = 'BSLightingShaderProperty' then matSuffix := 'bgsm'
+                    else if shaderProp.BlockType = 'BSEffectShaderProperty' then matSuffix := 'bgem'
+                    else bHasShaderProperty := false;
+                end;
+
+                if not bHasShaderProperty then continue;
+                blockName := block.EditValues['Name'];
+
+                mat := wbNormalizeResourceName(shaderProp.EditValues['Name'], resMaterial);
                 matExt := ExtractFileExt(mat);
-                blocknamehere := IntToStr(i) + ' ' + block.BlockType;
+                blocknamehere := IntToStr(i) + ' ' + shaderProp.BlockType;
                 joCustomMaterial := TJsonObject.Create;
                 try
-                    if (not (SameText(matExt, '.bgsm') or SameText(matExt, '.bgem'))) or (not ResourceExists(mat)) then begin
-                        slNeedsMaterials.Add('Model may need a ' + block.BlockType + ' material: ' + #9 + model + #9 + blockName);
+                    if (not (SameText(matExt, matSuffix))) or (not ResourceExists(mat)) then begin
+                        slNeedsMaterials.Add('Model may need a ' + shaderProp.BlockType + ' material: ' + #9 + model + #9 + blockName);
                         bBlockMissingMat := True;
                         Result := True;
-                        if (block.BlockType = 'BSEffectShaderProperty') then begin
-                            matSuffix := 'bgem';
-                            diffuse := LowerCase(wbNormalizeResourceName(block.EditValues['Source Texture'], resTexture));
+                        if matSuffix = 'bgem' then begin
+                            diffuse := LowerCase(wbNormalizeResourceName(shaderProp.EditValues['Source Texture'], resTexture));
                             if diffuse = '' then continue;
-                            controller := block.Elements['Controller'];
+                            controller := shaderProp.Elements['Controller'];
                             if Assigned(controller) then begin
                                 controllerLink := controller.LinksTo;
                                 if Assigned(controllerLink) then continue;
@@ -762,11 +782,9 @@ begin
 
                             count := joCustomMaterials.O[matSuffix].O[diffuse].Count + 1;
 
-                            AlphaPropEle := nif.Blocks[i - 1].Elements['Alpha Property'];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'no';
-                            if Assigned(AlphaPropEle) then begin
-                                NiAlphaProp := AlphaPropEle.LinksTo;
+                            if bHasAlpha then begin
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending 4333
@@ -790,16 +808,16 @@ begin
                                 end;
                             end;
 
-                            uv := block.EditValues['UV Offset'];
+                            uv := shaderProp.EditValues['UV Offset'];
                             tsUV := SplitString(uv, ' ');
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['UOffset'] := tsUV[0];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['VOffset'] := tsUV[1];
-                            uv := block.EditValues['UV Scale'];
+                            uv := shaderProp.EditValues['UV Scale'];
                             tsUV := SplitString(uv, ' ');
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['UScale'] := tsUV[0];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['VScale'] := tsUV[1];
                             
-                            clampMode := block.EditValues['Texture Clamp Mode'];
+                            clampMode := shaderProp.EditValues['Texture Clamp Mode'];
                             if clampMode = 'WRAP_S_WRAP_T'
                             then joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TileFlags'] := 3
                             else if clampMode = 'CLAMP_S_CLAMP_T'
@@ -809,7 +827,7 @@ begin
                             else if clampMode = 'WRAP_S_CLAMP_T'
                             then joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TileFlags'] := 2;
 
-                            emitColor := block.EditValues['Emissive Color'];
+                            emitColor := shaderProp.EditValues['Emissive Color'];
                             if LeftStr(emitColor, 1) = '#' then begin
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BaseColor'] := LeftStr(emitColor, 7);
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToInt('$' + RightStr(emitColor, 2)) / 255.0);
@@ -818,17 +836,17 @@ begin
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToFloatDef(RightStr(emitColor, 8),1));
                             end;
 
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['LightingInfluence'] := block.EditValues['Lighting Influence'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapMinLOD'] := block.EditValues['Env Map Min LOD'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['LightingInfluence'] := shaderProp.EditValues['Lighting Influence'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapMinLOD'] := shaderProp.EditValues['Env Map Min LOD'];
 
-                            FalloffEnabled := IntToYesNo(block.NativeValues['Shader Flags 1\Use_Falloff']);
+                            FalloffEnabled := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Use_Falloff']);
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffEnabled'] := FalloffEnabled;
 
                             if FalloffEnabled = 'yes' then begin
-                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStartAngle'] := block.EditValues['Falloff Start Angle'];
-                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStopAngle'] := block.EditValues['Falloff Stop Angle'];
-                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStartOpacity'] := block.EditValues['Falloff Start Opacity'];
-                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStopOpacity'] := block.EditValues['Falloff Stop Opacity'];
+                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStartAngle'] := shaderProp.EditValues['Falloff Start Angle'];
+                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStopAngle'] := shaderProp.EditValues['Falloff Stop Angle'];
+                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStartOpacity'] := shaderProp.EditValues['Falloff Start Opacity'];
+                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStopOpacity'] := shaderProp.EditValues['Falloff Stop Opacity'];
                             end else begin
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStartAngle'] := '1.000000';
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStopAngle'] := '1.000000';
@@ -836,80 +854,79 @@ begin
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffStopOpacity'] := '0.000000';
                             end;
 
-                            SoftEnabled := IntToYesNo(block.NativeValues['Shader Flags 1\Soft_Effect']);
+                            SoftEnabled := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Soft_Effect']);
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SoftEnabled'] := SoftEnabled;
                             if SoftEnabled = 'yes' then
-                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SoftDepth'] := block.EditValues['Soft Falloff Depth']
+                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SoftDepth'] := shaderProp.EditValues['Soft Falloff Depth']
                             else
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SoftDepth'] := '0.000000';
 
-                            EnvironmentMapping := IntToYesNo(block.NativeValues['Shader Flags 1\Environment_Mapping']);
-                            EnvironmentMappingMaskScale := block.EditValues['Environment Map Scale'];
+                            EnvironmentMapping := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Environment_Mapping']);
+                            EnvironmentMappingMaskScale := shaderProp.EditValues['Environment Map Scale'];
                             if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                             if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMapping'] := EnvironmentMapping;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
 
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BaseColorScale'] := block.EditValues['Emissive Multiple'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleTexture'] := block.EditValues['Grayscale Texture'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapTexture'] := block.EditValues['Env Map Texture'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NormalTexture'] := block.EditValues['Normal Texture'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapMaskTexture'] := block.EditValues['Env Mask Texture'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BaseColorScale'] := shaderProp.EditValues['Emissive Multiple'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleTexture'] := shaderProp.EditValues['Grayscale Texture'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapTexture'] := shaderProp.EditValues['Env Map Texture'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NormalTexture'] := shaderProp.EditValues['Normal Texture'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapMaskTexture'] := shaderProp.EditValues['Env Mask Texture'];
 
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteColor'] := IntToYesNo(block.NativeValues['Shader Flags 1\GrayscaleToPalette_Color']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteAlpha'] := IntToYesNo(block.NativeValues['Shader Flags 1\GrayscaleToPalette_Alpha']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffColorEnabled'] := IntToYesNo(block.NativeValues['Shader Flags 1\RGB_Falloff']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Refraction'] := IntToYesNo(block.NativeValues['Shader Flags 1\Refraction']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Decal'] := IntToYesNo(block.NativeValues['Shader Flags 1\Decal']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteColor'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\GrayscaleToPalette_Color']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteAlpha'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\GrayscaleToPalette_Alpha']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FalloffColorEnabled'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\RGB_Falloff']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Refraction'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Refraction']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Decal'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Decal']);
                             
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferTest'] := IntToYesNo(block.NativeValues['Shader Flags 1\ZBuffer_Test']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferWrite'] := IntToYesNo(block.NativeValues['Shader Flags 2\ZBuffer_Write']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DecalNoFade'] := IntToYesNo(block.NativeValues['Shader Flags 2\No_Fade']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TwoSided'] :=IntToYesNo(block.NativeValues['Shader Flags 2\Double_Sided']);
-                            //joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(block.NativeValues['Shader Flags 2\Glow_Map']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EffectLightingEnabled'] := IntToYesNo(block.NativeValues['Shader Flags 2\Effect_Lighting']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferTest'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\ZBuffer_Test']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferWrite'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\ZBuffer_Write']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DecalNoFade'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\No_Fade']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TwoSided'] :=IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Double_Sided']);
+                            //joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Glow_Map']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EffectLightingEnabled'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Effect_Lighting']);
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].A['nifs'].Add(model);
 
 
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DepthBias'] := block.EditValues['DepthBias'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NonOccluder'] := block.EditValues['NonOccluder'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ScreenSpaceReflections'] := block.EditValues['ScreenSpaceReflections'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_ScreenSpaceReflections'] := block.EditValues['WetnessControl_ScreenSpaceReflections'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAlbedo'] := block.EditValues['WriteMaskAlbedo'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAmbientOcclusion'] := block.EditValues['WriteMaskAmbientOcclusion'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskEmissive'] := block.EditValues['WriteMaskEmissive'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskGloss'] := block.EditValues['WriteMaskGloss'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskNormal'] := block.EditValues['WriteMaskNormal'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskSpecular'] := block.EditValues['WriteMaskSpecular'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DepthBias'] := shaderProp.EditValues['DepthBias'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NonOccluder'] := shaderProp.EditValues['NonOccluder'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ScreenSpaceReflections'] := shaderProp.EditValues['ScreenSpaceReflections'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_ScreenSpaceReflections'] := shaderProp.EditValues['WetnessControl_ScreenSpaceReflections'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAlbedo'] := shaderProp.EditValues['WriteMaskAlbedo'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAmbientOcclusion'] := shaderProp.EditValues['WriteMaskAmbientOcclusion'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskEmissive'] := shaderProp.EditValues['WriteMaskEmissive'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskGloss'] := shaderProp.EditValues['WriteMaskGloss'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskNormal'] := shaderProp.EditValues['WriteMaskNormal'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskSpecular'] := shaderProp.EditValues['WriteMaskSpecular'];
                             
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionFalloff'] := block.EditValues['RefractionFalloff'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionPower'] := block.EditValues['RefractionPower'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BloodEnabled'] := block.EditValues['BloodEnabled'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EffectPbrSpecular'] := block.EditValues['EffectPbrSpecular'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassEnabled'] := block.EditValues['GlassEnabled'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EmittanceColor'] := block.EditValues['EmittanceColor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassFresnelColor'] := block.EditValues['GlassFresnelColor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_ExposureOffset'] := block.EditValues['AdaptativeEmissive_ExposureOffset'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMax'] := block.EditValues['AdaptativeEmissive_FinalExposureMax'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMin'] := block.EditValues['AdaptativeEmissive_FinalExposureMin'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassBlurScaleBase'] := block.EditValues['GlassBlurScaleBase'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassBlurScaleFactor'] := block.EditValues['GlassBlurScaleFactor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassRefractionScaleBase'] := block.EditValues['GlassRefractionScaleBase'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassDirtOverlay'] := block.EditValues['GlassDirtOverlay'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassRoughnessScratch'] := block.EditValues['GlassRoughnessScratch'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlowTexture'] := block.EditValues['GlowTexture'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['LightingTexture'] := block.EditValues['LightingTexture'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SpecularTexture'] := block.EditValues['SpecularTexture'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionFalloff'] := shaderProp.EditValues['RefractionFalloff'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionPower'] := shaderProp.EditValues['RefractionPower'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BloodEnabled'] := shaderProp.EditValues['BloodEnabled'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EffectPbrSpecular'] := shaderProp.EditValues['EffectPbrSpecular'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassEnabled'] := shaderProp.EditValues['GlassEnabled'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EmittanceColor'] := shaderProp.EditValues['EmittanceColor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassFresnelColor'] := shaderProp.EditValues['GlassFresnelColor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_ExposureOffset'] := shaderProp.EditValues['AdaptativeEmissive_ExposureOffset'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMax'] := shaderProp.EditValues['AdaptativeEmissive_FinalExposureMax'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMin'] := shaderProp.EditValues['AdaptativeEmissive_FinalExposureMin'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassBlurScaleBase'] := shaderProp.EditValues['GlassBlurScaleBase'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassBlurScaleFactor'] := shaderProp.EditValues['GlassBlurScaleFactor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassRefractionScaleBase'] := shaderProp.EditValues['GlassRefractionScaleBase'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassDirtOverlay'] := shaderProp.EditValues['GlassDirtOverlay'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlassRoughnessScratch'] := shaderProp.EditValues['GlassRoughnessScratch'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlowTexture'] := shaderProp.EditValues['GlowTexture'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['LightingTexture'] := shaderProp.EditValues['LightingTexture'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SpecularTexture'] := shaderProp.EditValues['SpecularTexture'];
                         end else begin
-                            matSuffix := 'bgsm';
-                            TextureSetEle := block.Elements['Texture Set'];
+                            TextureSetEle := shaderProp.Elements['Texture Set'];
                             if not Assigned(TextureSetEle) then continue;
                             TextureSet := TextureSetEle.LinksTo;
                             if not Assigned(TextureSet) then continue;
                             Textures := TextureSet.Elements['Textures'];
                             diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             if diffuse = '' then continue;
-                            controller := block.Elements['Controller'];
+                            controller := shaderProp.Elements['Controller'];
                             if Assigned(controller) then begin
                                 controllerLink := controller.LinksTo;
                                 if Assigned(controllerLink) then continue;
@@ -917,11 +934,9 @@ begin
 
                             count := joCustomMaterials.O[matSuffix].O[diffuse].Count + 1;
 
-                            AlphaPropEle := nif.Blocks[i - 1].Elements['Alpha Property'];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Unknown';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'no';
-                            if Assigned(AlphaPropEle) then begin
-                                NiAlphaProp := AlphaPropEle.LinksTo;
+                            if bHasAlpha then begin
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
                                     //Alpha Blending 4333
@@ -943,16 +958,16 @@ begin
                                 end;
                             end;
 
-                            uv := block.EditValues['UV Offset'];
+                            uv := shaderProp.EditValues['UV Offset'];
                             tsUV := SplitString(uv, ' ');
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['UOffset'] := tsUV[0];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['VOffset'] := tsUV[1];
-                            uv := block.EditValues['UV Scale'];
+                            uv := shaderProp.EditValues['UV Scale'];
                             tsUV := SplitString(uv, ' ');
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['UScale'] := tsUV[0];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['VScale'] := tsUV[1];
                             
-                            clampMode := block.EditValues['Texture Clamp Mode'];
+                            clampMode := shaderProp.EditValues['Texture Clamp Mode'];
                             if clampMode = 'WRAP_S_WRAP_T'
                             then joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TileFlags'] := 3
                             else if clampMode = 'CLAMP_S_CLAMP_T'
@@ -962,9 +977,9 @@ begin
                             else if clampMode = 'WRAP_S_CLAMP_T'
                             then joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TileFlags'] := 2;
 
-                            emitColor := block.EditValues['Emissive Color'];
-                            emitMult := block.EditValues['Emissive Multiple'];
-                            emit := IntToYesNo(block.NativeValues['Shader Flags 1\Own_Emit']);
+                            emitColor := shaderProp.EditValues['Emissive Color'];
+                            emitMult := shaderProp.EditValues['Emissive Multiple'];
+                            emit := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Own_Emit']);
                             if emit = 'yes' then begin
                                 if emitColor = '#000000' then emit := 'no';
                                 if emitMult = '0.000000' then emit := 'no';
@@ -977,21 +992,21 @@ begin
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EmittanceMult'] := emitMult;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EmittanceColor'] := emitColor;
 
-                            BackLightPower := block.EditValues['Backlight Power'];
+                            BackLightPower := shaderProp.EditValues['Backlight Power'];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BackLightPower'] := BackLightPower;
                             if BackLightPower = '0.000000' then BackLighting := 'no' else BackLighting := 'yes';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['BackLighting'] := BackLighting;
 
-                            Refraction := IntToYesNo(block.NativeValues['Shader Flags 1\Refraction']);
-                            RefractionPower := block.EditValues['Refraction Strength'];
+                            Refraction := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Refraction']);
+                            RefractionPower := shaderProp.EditValues['Refraction Strength'];
                             if Refraction = 'no' then RefractionPower := '0.000000';
                             if RefractionPower = '0.000000' then Refraction := 'no';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Refraction'] := Refraction;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionPower'] := RefractionPower;
 
-                            SpecularEnabled := IntToYesNo(block.NativeValues['Shader Flags 1\Specular']);
-                            SpecularMult := block.EditValues['Specular Strength'];
-                            SpecularColor := block.EditValues['Specular Color'];
+                            SpecularEnabled := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Specular']);
+                            SpecularMult := shaderProp.EditValues['Specular Strength'];
+                            SpecularColor := shaderProp.EditValues['Specular Color'];
                             if SpecularEnabled = 'no' then begin
                                 SpecularMult := '0.000000';
                                 SpecularColor := '#FFFFFF';
@@ -1004,41 +1019,41 @@ begin
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SpecularColor'] := SpecularColor;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SpecularMult'] := SpecularMult;
 
-                            RimLighting := IntToYesNo(block.NativeValues['Shader Flags 1\Character_Lighting']);
-                            RimPower := block.EditValues['Rimlight Power'];
+                            RimLighting := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Character_Lighting']);
+                            RimPower := shaderProp.EditValues['Rimlight Power'];
                             if RimLighting = 'no' then RimPower := '0.000000';
                             if RimPower = '0.000000' then RimLighting := 'no';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RimLighting'] := RimLighting;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RimPower'] := RimPower;
 
-                            GrayscaleToPaletteColor := IntToYesNo(block.NativeValues['Shader Flags 1\GrayscaleToPalette_Color']);
+                            GrayscaleToPaletteColor := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\GrayscaleToPalette_Color']);
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteColor'] := GrayscaleToPaletteColor;
                             if GrayscaleToPaletteColor = 'yes' then
-                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteScale'] := block.EditValues['Grayscale To Palette Scale']
+                                joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteScale'] := shaderProp.EditValues['Grayscale To Palette Scale']
                             else
                                 joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleToPaletteScale'] := '0.000000';
 
-                            EnvironmentMapping := IntToYesNo(block.NativeValues['Shader Flags 1\Environment_Mapping']);
-                            EnvironmentMappingMaskScale := block.EditValues['Environment Map Scale'];
+                            EnvironmentMapping := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Environment_Mapping']);
+                            EnvironmentMappingMaskScale := shaderProp.EditValues['Environment Map Scale'];
                             if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                             if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMapping'] := EnvironmentMapping;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
                             
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RootMaterialPath'] := block.EditValues['Root Material'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToFloatDef(block.EditValues['Alpha'],1));
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Smoothness'] := block.EditValues['Smoothness'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SubsurfaceLightingRolloff'] := block.EditValues['Subsurface Rolloff'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FresnelPower'] := block.EditValues['Fresnel Power'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_SpecScale'] := block.EditValues['Wetness\Spec Scale'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_SpecPowerScale'] := block.EditValues['Wetness\Spec Power'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_SpecMinvar'] := block.EditValues['Wetness\Min Var'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_EnvMapScale'] := block.EditValues['Wetness\Env Map Scale'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_FresnelPower'] := block.EditValues['Wetness\Fresnel Power'];
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_Metalness'] := block.EditValues['Wetness\Metalness'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RootMaterialPath'] := shaderProp.EditValues['Root Material'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToFloatDef(shaderProp.EditValues['Alpha'],1));
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Smoothness'] := shaderProp.EditValues['Smoothness'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SubsurfaceLightingRolloff'] := shaderProp.EditValues['Subsurface Rolloff'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FresnelPower'] := shaderProp.EditValues['Fresnel Power'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_SpecScale'] := shaderProp.EditValues['Wetness\Spec Scale'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_SpecPowerScale'] := shaderProp.EditValues['Wetness\Spec Power'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_SpecMinvar'] := shaderProp.EditValues['Wetness\Min Var'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_EnvMapScale'] := shaderProp.EditValues['Wetness\Env Map Scale'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_FresnelPower'] := shaderProp.EditValues['Wetness\Fresnel Power'];
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_Metalness'] := shaderProp.EditValues['Wetness\Metalness'];
                             
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ScreenSpaceReflections'] := IntToYesNo(block.NativeValues['Use Screen Space Reflections']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_ScreenSpaceReflections'] := IntToYesNo(block.NativeValues['Wetness Control: Use SSR']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ScreenSpaceReflections'] := IntToYesNo(shaderProp.NativeValues['Use Screen Space Reflections']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WetnessControl_ScreenSpaceReflections'] := IntToYesNo(shaderProp.NativeValues['Wetness Control: Use SSR']);
 
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(Textures[1].EditValue, resTexture));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(Textures[2].EditValue, resTexture));
@@ -1048,33 +1063,33 @@ begin
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(Textures[6].EditValue, resTexture));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SmoothSpecTexture'] := LowerCase(wbNormalizeResourceName(Textures[7].EditValue, resTexture));
 
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['CastShadows'] := IntToYesNo(block.NativeValues['Shader Flags 1\Cast_Shadows']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Facegen'] := IntToYesNo(block.NativeValues['Shader Flags 1\Face']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ModelSpaceNormals'] := IntToYesNo(block.NativeValues['Shader Flags 1\Model_Space_Normals']);
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Terrain'] := IntToYesNo(block.NativeValues['Shader Flags 1\Landscape']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['CastShadows'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Cast_Shadows']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Facegen'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Face']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ModelSpaceNormals'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Model_Space_Normals']);
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Terrain'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Landscape']);
                             
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingEye'] := IntToYesNo(block.NativeValues['Shader Flags 1\Eye_Environment_Mapping']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DissolveFade'] := IntToYesNo(block.NativeValues['Shader Flags 1\Screendoor_Alpha_Fade']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Hair'] := IntToYesNo(block.NativeValues['Shader Flags 1\Hair']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['HideSecret'] := IntToYesNo(block.NativeValues['Shader Flags 1\Localmap_Hide_Secret']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SkinTint'] := IntToYesNo(block.NativeValues['Shader Flags 1\Skin_Tint']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Tessellate'] := IntToYesNo(block.NativeValues['Shader Flags 1\Tessellate']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Decal'] := IntToYesNo(block.NativeValues['Shader Flags 1\Decal']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ExternalEmittance'] := IntToYesNo(block.NativeValues['Shader Flags 1\External_Emittance']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferTest'] := IntToYesNo(block.NativeValues['Shader Flags 1\ZBuffer_Test']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingEye'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Eye_Environment_Mapping']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DissolveFade'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Screendoor_Alpha_Fade']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Hair'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Hair']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['HideSecret'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Localmap_Hide_Secret']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SkinTint'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Skin_Tint']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Tessellate'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Tessellate']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Decal'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\Decal']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ExternalEmittance'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\External_Emittance']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferTest'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 1\ZBuffer_Test']);
 
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferWrite'] := IntToYesNo(block.NativeValues['Shader Flags 2\ZBuffer_Write']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DecalNoFade'] := IntToYesNo(block.NativeValues['Shader Flags 2\No_Fade']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TwoSided'] := IntToYesNo(block.NativeValues['Shader Flags 2\Double_Sided']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(block.NativeValues['Shader Flags 2\Glow_Map']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AnisoLighting'] := IntToYesNo(block.NativeValues['Shader Flags 2\Anisotropic_Lighting']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SkewSpecularAlpha'] := IntToYesNo(block.NativeValues['Shader Flags 2\Skew_Specular_Alpha']);
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Tree'] := IntToYesNo(block.NativeValues['Shader Flags 2\Tree_Anim']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ZBufferWrite'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\ZBuffer_Write']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DecalNoFade'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\No_Fade']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TwoSided'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Double_Sided']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Glowmap'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Glow_Map']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AnisoLighting'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Anisotropic_Lighting']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SkewSpecularAlpha'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Skew_Specular_Alpha']);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Tree'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Tree_Anim']);
 
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].A['nifs'].Add(model);
                             
 
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NonOccluder'] := block.EditValues['NonOccluder'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NonOccluder'] := shaderProp.EditValues['NonOccluder'];
 
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DistanceFieldAlphaTexture'] := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['FlowTexture'] := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
@@ -1082,43 +1097,43 @@ begin
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SpecularTexture'] := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WrinklesTexture'] := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
 
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DepthBias'] := block.EditValues['DepthBias'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAlbedo'] := block.EditValues['WriteMaskAlbedo'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAmbientOcclusion'] := block.EditValues['WriteMaskAmbientOcclusion'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskEmissive'] := block.EditValues['WriteMaskEmissive'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskGloss'] := block.EditValues['WriteMaskGloss'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskNormal'] := block.EditValues['WriteMaskNormal'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskSpecular'] := block.EditValues['WriteMaskSpecular'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionFalloff'] := block.EditValues['RefractionFalloff'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AssumeShadowmask'] := block.EditValues['AssumeShadowmask'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['CustomPorosity'] := block.EditValues['CustomPorosity'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DepthBias'] := shaderProp.EditValues['DepthBias'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAlbedo'] := shaderProp.EditValues['WriteMaskAlbedo'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskAmbientOcclusion'] := shaderProp.EditValues['WriteMaskAmbientOcclusion'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskEmissive'] := shaderProp.EditValues['WriteMaskEmissive'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskGloss'] := shaderProp.EditValues['WriteMaskGloss'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskNormal'] := shaderProp.EditValues['WriteMaskNormal'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['WriteMaskSpecular'] := shaderProp.EditValues['WriteMaskSpecular'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RefractionFalloff'] := shaderProp.EditValues['RefractionFalloff'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AssumeShadowmask'] := shaderProp.EditValues['AssumeShadowmask'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['CustomPorosity'] := shaderProp.EditValues['CustomPorosity'];
                             
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := block.EditValues['EnableEditorAlphaRef'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingWindow'] := block.EditValues['EnvironmentMappingWindow'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['PBR'] := block.EditValues['PBR'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ReceiveShadows'] := block.EditValues['ReceiveShadows'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SubsurfaceLighting'] := block.EditValues['SubsurfaceLighting'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Translucency'] := block.EditValues['Translucency'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyMixAlbedoWithSubsurfaceColor'] := block.EditValues['TranslucencyMixAlbedoWithSubsurfaceColor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyThickObject'] := block.EditValues['TranslucencyThickObject'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['UseAdaptativeEmissive'] := block.EditValues['UseAdaptativeEmissive'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['HairTintColor'] := block.EditValues['HairTintColor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencySubsurfaceColor'] := block.EditValues['TranslucencySubsurfaceColor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_ExposureOffset'] := block.EditValues['AdaptativeEmissive_ExposureOffset'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMax'] := block.EditValues['AdaptativeEmissive_FinalExposureMax'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMin'] := block.EditValues['AdaptativeEmissive_FinalExposureMin'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DisplacementTextureBias'] := block.EditValues['DisplacementTextureBias'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DisplacementTextureScale'] := block.EditValues['DisplacementTextureScale'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['LumEmittance'] := block.EditValues['LumEmittance'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['PorosityValue'] := block.EditValues['PorosityValue'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TerrainRotationAngle'] := block.EditValues['TerrainRotationAngle'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TerrainThresholdFalloff'] := block.EditValues['TerrainThresholdFalloff'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TerrainTilingDistance'] := block.EditValues['TerrainTilingDistance'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TessellationBaseFactor'] := block.EditValues['TessellationBaseFactor'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TessellationFadeDistance'] := block.EditValues['TessellationFadeDistance'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TessellationPnScale'] := block.EditValues['TessellationPnScale'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyTransmissiveScale'] := block.EditValues['TranslucencyTransmissiveScale'];
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyTurbulence'] := block.EditValues['TranslucencyTurbulence'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := shaderProp.EditValues['EnableEditorAlphaRef'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingWindow'] := shaderProp.EditValues['EnvironmentMappingWindow'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['PBR'] := shaderProp.EditValues['PBR'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ReceiveShadows'] := shaderProp.EditValues['ReceiveShadows'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SubsurfaceLighting'] := shaderProp.EditValues['SubsurfaceLighting'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Translucency'] := shaderProp.EditValues['Translucency'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyMixAlbedoWithSubsurfaceColor'] := shaderProp.EditValues['TranslucencyMixAlbedoWithSubsurfaceColor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyThickObject'] := shaderProp.EditValues['TranslucencyThickObject'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['UseAdaptativeEmissive'] := shaderProp.EditValues['UseAdaptativeEmissive'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['HairTintColor'] := shaderProp.EditValues['HairTintColor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencySubsurfaceColor'] := shaderProp.EditValues['TranslucencySubsurfaceColor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_ExposureOffset'] := shaderProp.EditValues['AdaptativeEmissive_ExposureOffset'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMax'] := shaderProp.EditValues['AdaptativeEmissive_FinalExposureMax'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AdaptativeEmissive_FinalExposureMin'] := shaderProp.EditValues['AdaptativeEmissive_FinalExposureMin'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DisplacementTextureBias'] := shaderProp.EditValues['DisplacementTextureBias'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DisplacementTextureScale'] := shaderProp.EditValues['DisplacementTextureScale'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['LumEmittance'] := shaderProp.EditValues['LumEmittance'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['PorosityValue'] := shaderProp.EditValues['PorosityValue'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TerrainRotationAngle'] := shaderProp.EditValues['TerrainRotationAngle'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TerrainThresholdFalloff'] := shaderProp.EditValues['TerrainThresholdFalloff'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TerrainTilingDistance'] := shaderProp.EditValues['TerrainTilingDistance'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TessellationBaseFactor'] := shaderProp.EditValues['TessellationBaseFactor'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TessellationFadeDistance'] := shaderProp.EditValues['TessellationFadeDistance'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TessellationPnScale'] := shaderProp.EditValues['TessellationPnScale'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyTransmissiveScale'] := shaderProp.EditValues['TranslucencyTransmissiveScale'];
+                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['TranslucencyTurbulence'] := shaderProp.EditValues['TranslucencyTurbulence'];
                         end;
                         mess := model + #9 + blocknamehere + '\Name: Assigned material to "';
                         
@@ -1131,10 +1146,10 @@ begin
                         end else begin
                             IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, blocknamehere, matPath);
                         end;
-                        block.EditValues['Name'] := matPath;
+                        shaderProp.EditValues['Name'] := matPath;
                         bChanged := true;
                     end;
-                    CheckForMaterialMismatch(block, bChanged, mat, matExt, model, blocknamehere);
+                    CheckForMaterialMismatch(shaderProp, bChanged, mat, matExt, model, blocknamehere);
                 finally
                     joCustomMaterial.Free;
                 end;
@@ -1150,7 +1165,7 @@ begin
     // end;
 end;
 
-procedure CheckForMaterialMismatch(var block: TwbNifBlock; var bChanged: boolean; const mat, matExt, model, blocknamehere: string);
+procedure CheckForMaterialMismatch(var shaderProp: TwbNifBlock; var bChanged: boolean; const mat, matExt, model, blocknamehere: string);
 var
     bgsm: TwbBGSMFile;
 begin
@@ -1159,9 +1174,9 @@ begin
     try
         if SameText(matExt, '.bgsm') then begin
             bgsm.LoadFromResource(mat);
-            if ((bgsm.EditValues['Decal'] = 'yes') and (block.NativeValues['Shader Flags 1\Decal'] = 0)) then begin
+            if ((bgsm.EditValues['Decal'] = 'yes') and (shaderProp.NativeValues['Shader Flags 1\Decal'] = 0)) then begin
                 slNeedsDecalFlag.Add(model + #9 + blocknamehere + ': Added missing Decal shader flag.');
-                block.NativeValues['Shader Flags 1\Decal'] := 1;
+                shaderProp.NativeValues['Shader Flags 1\Decal'] := 1;
                 bChanged := true;
             end;
         end;
