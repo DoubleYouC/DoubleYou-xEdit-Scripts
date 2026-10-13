@@ -526,7 +526,15 @@ begin
             then score := score + 1
             else if (key = 'TwoSided') and (y = 'yes') then score := -100
             else if (key = 'Decal') and (y = 'yes') then score := -100
-            else if pos(key, 'UOffset,VOffset,UScale,VScale,AlphaTest,GrayscaleToPaletteColor,Glowmap,Alpha,BaseColor,NormalTexture') > 0 then score := -100;
+            else if (key = 'UOffset') then score := -100
+            else if (key = 'VOffset') then score := -100
+            else if (key = 'UScale') then score := -100
+            else if (key = 'VScale') then score := -100
+            else if (key = 'AlphaTest') and (y = 'yes') then score := -100
+            else if (key = 'GrayscaleToPaletteColor') then score := -100
+            else if (key = 'Glowmap') then score := -100
+            else if (key = 'BaseColor') then score := -100
+            else if (key = 'NormalTexture') then score := -100;
             //AddMessage(x + #9 + y + #9 + BoolToStr(x = y))
             // except on E: Exception do
             //     AddMessage('Error: ' + mat + #9 + diffuse + #9 + key + #9 E.Message);
