@@ -357,7 +357,6 @@ begin
                 end else if key = 'nifs' then continue
                 else
                     bgsm.EditValues[key] := joCustomMaterial.S[key];
-                AddMessage(mat + #9 + key + joCustomMaterial.S[key]);
             end;
 
             EnsureDirectoryExists(sOutputDir + '\' + ExtractFilePath(mat));
