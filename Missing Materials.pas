@@ -83,8 +83,9 @@ var
     slArchivedFiles: TStringList;
     i, TileFlags: integer;
     f, ext, diffuse, EnvironmentMappingMaskScale, EnvironmentMapping, SpecularMult, SpecularColor, SpecularEnabled,
-    RimLighting, RimPower, EmitEnabled, EmittanceColor, EmittanceMult, BackLighting, BackLightPower, Refraction,
-    RefractionPower, GrayscaleToPaletteColor, GrayscaleTexture, GrayscaleToPaletteScale, EnvmapTexture, SmoothSpecTexture: string;
+    RimLighting, RimPower, EmitEnabled, EmittanceColor, EmittanceMult, BackLighting, BackLightPower, Refraction, NormalTexture,
+    RefractionPower, GrayscaleToPaletteColor, GrayscaleTexture, GrayscaleToPaletteScale, EnvmapTexture, SmoothSpecTexture, testTexture,
+    WetnessControl_SpecScale, WetnessControl_SpecPowerScale, WetnessControl_SpecMinvar, WetnessControl_Metalness, WetnessControl_FresnelPower, WetnessControl_EnvMapScale: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
 begin
@@ -220,12 +221,26 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['FresnelPower'] := bgsm.EditValues['FresnelPower'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Smoothness'] := bgsm.EditValues['Smoothness'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SubsurfaceLightingRolloff'] := bgsm.EditValues['SubsurfaceLightingRolloff'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_EnvMapScale'] := bgsm.EditValues['WetnessControlEnvMapScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_FresnelPower'] := bgsm.EditValues['WetnessControlFresnelPower'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_Metalness'] := bgsm.EditValues['WetnessControlMetalness'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecMinvar'] := bgsm.EditValues['WetnessControlSpecMinvar'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecPowerScale'] := bgsm.EditValues['WetnessControlSpecPowerScale'];
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecScale'] := bgsm.EditValues['WetnessControlSpecScale'];
+
+                    WetnessControl_EnvMapScale := bgsm.EditValues['WetnessControlEnvMapScale'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_EnvMapScale'] := WetnessControl_EnvMapScale;
+                    if (LeftStr(WetnessControl_EnvMapScale, 1) = '-') and (WetnessControl_EnvMapScale <> '-1.000000') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a non-passthru, negative WetnessControl_EnvMapScale value:' + #9 + WetnessControl_EnvMapScale);
+                    WetnessControl_FresnelPower := bgsm.EditValues['WetnessControlFresnelPower'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_FresnelPower'] := WetnessControl_FresnelPower;
+                    if (LeftStr(WetnessControl_FresnelPower, 1) = '-') and (WetnessControl_FresnelPower <> '-1.000000') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a non-passthru, negative WetnessControl_FresnelPower value:' + #9 + WetnessControl_FresnelPower);
+                    WetnessControl_Metalness := bgsm.EditValues['WetnessControlMetalness'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_Metalness'] := WetnessControl_Metalness;
+                    if (LeftStr(WetnessControl_Metalness, 1) = '-') and (WetnessControl_Metalness <> '-1.000000') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a non-passthru, negative WetnessControl_Metalness value:' + #9 + WetnessControl_Metalness);
+                    WetnessControl_SpecMinvar := bgsm.EditValues['WetnessControlSpecMinvar'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecMinvar'] := WetnessControl_SpecMinvar;
+                    if (LeftStr(WetnessControl_SpecMinvar, 1) = '-') and (WetnessControl_SpecMinvar <> '-1.000000') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a non-passthru, negative WetnessControl_SpecMinvar value:' + #9 + WetnessControl_SpecMinvar);
+                    WetnessControl_SpecPowerScale := bgsm.EditValues['WetnessControlSpecPowerScale'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecPowerScale'] := WetnessControl_SpecPowerScale;
+                    if (LeftStr(WetnessControl_SpecPowerScale, 1) = '-') and (WetnessControl_SpecPowerScale <> '-1.000000') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a non-passthru, negative WetnessControl_SpecPowerScale value:' + #9 + WetnessControl_SpecPowerScale);
+                    WetnessControl_SpecScale := bgsm.EditValues['WetnessControlSpecScale'];
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['WetnessControl_SpecScale'] := WetnessControl_SpecScale;
+                    if (LeftStr(WetnessControl_SpecScale, 1) = '-') and (WetnessControl_SpecScale <> '-1.000000') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a non-passthru, negative WetnessControl_SpecScale value:' + #9 + WetnessControl_SpecScale);
+
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RootMaterialPath'] := bgsm.EditValues['RootMaterialPath'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DissolveFade'] := bgsm.EditValues['DissolveFade'];
 
@@ -235,12 +250,23 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['HairTintColor'] := bgsm.EditValues['HairTintColor'];
 
                     //textures
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
+                    NormalTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NormalTexture'] := NormalTexture;
+                    if (NormalTexture <> '') and (not SameText(RightStr(NormalTexture, 6), '_n.dds')) then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a normal texture that does not use the _n suffix:' + #9 + NormalTexture);
+                    if NormalTexture = '' then begin
+                        if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_n.dds';
+                        if ResourceExists(testTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material does not use its existing normal texture:' + #9 + testTexture);
+                    end;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Glow'], resTexture));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GrayscaleTexture'] := GrayscaleTexture;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Displacement'], resTexture));
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvmapTexture'] := EnvmapTexture;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\InnerLayer'], resTexture));
+                    if (SmoothSpecTexture <> '') and (not SameText(RightStr(SmoothSpecTexture, 6), '_s.dds')) then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a specular texture that does not use the _s suffix:' + #9 + NormalTexture);
+                    if SmoothSpecTexture = '' then begin
+                        if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_s.dds';
+                        if ResourceExists(testTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material does not use its existing specular texture:' + #9 + testTexture);
+                    end;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['SmoothSpecTexture'] := SmoothSpecTexture;
 
 
