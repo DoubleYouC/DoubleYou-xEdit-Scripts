@@ -473,6 +473,7 @@ begin
             mat := DiffuseToMaterial(diffuse, shader);
             if not Assigned(mat) then Exit;
             bgsm.EditValues['Textures\Diffuse'] := diffuse;
+            bgsm.EditValues['ReceiveShadows'] := 'no';
             for i := 0 to Pred(joCustomMaterial.Count) do begin
                 key := joCustomMaterial.Names[i];
                 if key = 'WetnessControl_ScreenSpaceReflections' then begin
@@ -558,11 +559,16 @@ begin
     Result := nil;
     if SameText(RightStr(diffuse, 6), '_d.dds') then suffixLength := 6 else suffixLength := 4;
     matBase := 'materials' + TrimLeftChars(TrimRightChars(diffuse, Length('textures')), suffixLength);
-    for i:=1 to 20 do begin
-        matHere := matBase + '_' + IntToStr(i) + '.' + shader;
-        if (not ResourceExists(matHere)) and (not FileExists(sOutputDir + '\' + matHere)) then begin
-            Result := matHere;
-            break;
+    matHere := matBase + '.' + shader;
+    if (not ResourceExists(matHere)) then if (not FileExists(sOutputDir + '\' + matHere)) then
+        Result := matHere
+    else begin
+        for i:=1 to 20 do begin
+            matHere := matBase + '_' + IntToStr(i) + '.' + shader;
+            if (not ResourceExists(matHere)) then if (not FileExists(sOutputDir + '\' + matHere)) then begin
+                Result := matHere;
+                break;
+            end;
         end;
     end;
 end;
@@ -1176,6 +1182,7 @@ begin
                             matPath := '';
                             IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, blocknamehere, matPath);
                             if matPath = '' then continue;
+                            slAddedMat.Add(mess + matPath + '"');
                         end else begin
                             IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, blocknamehere, matPath);
                         end;
