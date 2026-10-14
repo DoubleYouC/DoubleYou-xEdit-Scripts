@@ -472,7 +472,7 @@ begin
             bgsm.LoadFromResource('materials\default.bgsm');
             mat := DiffuseToMaterial(diffuse, shader);
             if not Assigned(mat) then Exit;
-            bgsm.EditValues['Textures\Diffuse'] := diffuse;
+            bgsm.EditValues['Textures\Diffuse'] := TrimRightChars(diffuse, 9);
             bgsm.EditValues['ReceiveShadows'] := 'no';
             for i := 0 to Pred(joCustomMaterial.Count) do begin
                 key := joCustomMaterial.Names[i];
@@ -525,7 +525,7 @@ begin
             mat := DiffuseToMaterial(diffuse, shader);
             if not Assigned(mat) then Exit;
 
-            bgem.EditValues['Textures\Base'] := diffuse;
+            bgem.EditValues['Textures\Base'] := TrimRightChars(diffuse, 9);
             for i := 0 to Pred(joCustomMaterial.Count) do begin
                 key := joCustomMaterial.Names[i];
                 if key = 'NormalTexture' then begin
