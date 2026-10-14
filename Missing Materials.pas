@@ -85,7 +85,8 @@ var
     f, ext, diffuse, EnvironmentMappingMaskScale, EnvironmentMapping, SpecularMult, SpecularColor, SpecularEnabled,
     RimLighting, RimPower, EmitEnabled, EmittanceColor, EmittanceMult, BackLighting, BackLightPower, Refraction, NormalTexture,
     RefractionPower, GrayscaleToPaletteColor, GrayscaleTexture, GrayscaleToPaletteScale, EnvmapTexture, SmoothSpecTexture, testTexture,
-    WetnessControl_SpecScale, WetnessControl_SpecPowerScale, WetnessControl_SpecMinvar, WetnessControl_Metalness, WetnessControl_FresnelPower, WetnessControl_EnvMapScale: string;
+    WetnessControl_SpecScale, WetnessControl_SpecPowerScale, WetnessControl_SpecMinvar, WetnessControl_Metalness, WetnessControl_FresnelPower, 
+    GlowTexture, WetnessControl_EnvMapScale, DisplacementTexture, InnerLayerTexture, EnvmapMaskTexture: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
 begin
@@ -104,12 +105,13 @@ begin
                 try
                     bgsm.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Diffuse'], resTexture));
+                    if diffuse <> '' then if not ResourceExists(diffuse) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a diffuse texture that does not exist:' + #9 + diffuse);
 
                     EnvmapTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
+                    if EnvmapTexture <> '' then if not ResourceExists(EnvmapTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
                     EnvironmentMapping := bgsm.EditValues['EnvironmentMapping'];
                     EnvironmentMappingMaskScale := bgsm.EditValues['EnvironmentMappingMaskScale'];
                     if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
-                    if (EnvmapTexture <> '') and (EnvironmentMapping = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
                     if EnvmapTexture = '' then EnvironmentMapping := 'no';
                     if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
@@ -118,6 +120,7 @@ begin
 
                     GrayscaleToPaletteColor := bgsm.EditValues['GrayscaleToPaletteColor'];
                     GrayscaleTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Grayscale'], resTexture));
+                    if GrayscaleTexture <> '' then if not ResourceExists(GrayscaleTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a grayscale texture that does not exist:' + #9 + GrayscaleTexture);
                     GrayscaleToPaletteScale := bgsm.EditValues['GrayscaleToPaletteScale'];
                     if (GrayscaleTexture = '') and (GrayscaleToPaletteColor = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses grayscale to palette but does not have a palette!');
                     if GrayscaleToPaletteColor = 'yes' then if GrayscaleTexture = '' then GrayscaleToPaletteColor := 'no';
@@ -165,6 +168,7 @@ begin
                     SpecularColor := bgsm.EditValues['SpecularColor'];
                     SpecularMult := bgsm.EditValues['SpecularMult'];
                     SmoothSpecTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\SmoothSpec'], resTexture));
+                    if SmoothSpecTexture <> '' then if not ResourceExists(SmoothSpecTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a specular texture that does not exist:' + #9 + SmoothSpecTexture);
                     if (SmoothSpecTexture = '') and (SpecularEnabled = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses specular but does not have a specular texture!');
                     if (SmoothSpecTexture <> '') and (SpecularEnabled = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a specular texture but does not use specular!');
                     if SpecularEnabled = 'yes' then begin
@@ -208,6 +212,7 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['AnisoLighting'] := bgsm.EditValues['AnisoLighting'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['CastShadows'] := bgsm.EditValues['CastShadows'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingEye'] := bgsm.EditValues['EnvironmentMappingEye'];
+                    if (EnvmapTexture <> '') and (EnvironmentMapping = 'no') then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['ExternalEmittance'] := bgsm.EditValues['ExternalEmittance'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Facegen'] := bgsm.EditValues['Facegen'];
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Glowmap'] := bgsm.EditValues['Glowmap'];
@@ -251,6 +256,7 @@ begin
 
                     //textures
                     NormalTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
+                    if NormalTexture <> '' then if not ResourceExists(NormalTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a normal texture that does not exist:' + #9 + NormalTexture);
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['NormalTexture'] := NormalTexture;
                     if (NormalTexture <> '') and (NormalTexture <> 'textures\effects\colornormalspecutility.dds') and (not SameText(RightStr(NormalTexture, 6), '_n.dds'))
                     then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a normal texture that does not use the _n suffix:' + #9 + NormalTexture);
@@ -258,11 +264,17 @@ begin
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_n.dds';
                         if ResourceExists(testTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material does not use its existing normal texture:' + #9 + testTexture);
                     end;
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Glow'], resTexture));
+                    GlowTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Glow'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GlowTexture'] := GlowTexture;
+                    if GlowTexture <> '' then if not ResourceExists(GlowTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a glowmap texture that does not exist:' + #9 + GlowTexture);
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['GrayscaleTexture'] := GrayscaleTexture;
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Displacement'], resTexture));
+                    DisplacementTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Displacement'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DisplacementTexture'] := DisplacementTexture;
+                    if DisplacementTexture <> '' then if not ResourceExists(DisplacementTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a displacement texture that does not exist:' + #9 + DisplacementTexture);
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvmapTexture'] := EnvmapTexture;
-                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\InnerLayer'], resTexture));
+                    InnerLayerTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\InnerLayer'], resTexture));
+                    joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['InnerLayerTexture'] := InnerLayerTexture;
+                    if InnerLayerTexture <> '' then if not ResourceExists(InnerLayerTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a inner layer texture that does not exist:' + #9 + InnerLayerTexture);
                     if (SmoothSpecTexture <> '') and (not SameText(RightStr(SmoothSpecTexture, 6), '_s.dds')) then slMaterialWarnings.Add(f + #9 + 'Warning! Material has a specular texture that does not use the _s suffix:' + #9 + SmoothSpecTexture);
                     if SmoothSpecTexture = '' then begin
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_s.dds';
@@ -322,6 +334,7 @@ begin
                 try
                     bgem.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Base'], resTexture));
+                    if diffuse <> '' then if not ResourceExists(diffuse) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a diffuse texture that does not exist:' + #9 + diffuse);
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['UOffset'] := bgem.EditValues['UOffset'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['VOffset'] := bgem.EditValues['VOffset'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['UScale'] := bgem.EditValues['UScale'];
@@ -337,6 +350,7 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['Refraction'] := bgem.EditValues['Refraction'];
 
                     EnvmapTexture := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Envmap'], resTexture));
+                    if EnvmapTexture <> '' then if not ResourceExists(EnvmapTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
                     EnvironmentMapping := bgem.EditValues['EnvironmentMapping'];
                     EnvironmentMappingMaskScale := bgem.EditValues['EnvironmentMappingMaskScale'];
                     if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
@@ -389,10 +403,16 @@ begin
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingInfluence'] := bgem.EditValues['LightingInfluence'];
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMinLOD'] := bgem.EditValues['EnvmapMinLOD'];
 
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMaskTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\EnvmapMask'], resTexture));
+                    EnvmapMaskTexture := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\EnvmapMask'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapMaskTexture'] := EnvmapMaskTexture;
+                    if EnvmapMaskTexture <> '' then if not ResourceExists(EnvmapMaskTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a environment mapping mask texture that does not exist:' + #9 + EnvmapMaskTexture);
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['EnvmapTexture'] := EnvmapTexture;
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Grayscale'], resTexture));
-                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Normal'], resTexture));
+                    GrayscaleTexture := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Grayscale'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['GrayscaleTexture'] := GrayscaleTexture;
+                    if GrayscaleTexture <> '' then if not ResourceExists(GrayscaleTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a grayscale texture that does not exist:' + #9 + GrayscaleTexture);
+                    NormalTexture := LowerCase(wbNormalizeResourceName(bgem.EditValues['Textures\Normal'], resTexture));
+                    joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NormalTexture'] := NormalTexture;
+                    if NormalTexture <> '' then if not ResourceExists(NormalTexture) then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a normal texture that does not exist:' + #9 + NormalTexture);
 
                     //no nif equivalent it would seem
                     joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['NonOccluder'] := bgem.EditValues['NonOccluder'];
@@ -663,8 +683,8 @@ begin
             else if (key = 'UScale') then score := -100
             else if (key = 'VScale') then score := -100
             else if (key = 'AlphaTest') then score := -100
-            else if (key = 'Alpha') then score := -100
-            else if (key = 'AlphaBlend') then score := -100
+            // else if (key = 'Alpha') then score := -100
+            // else if (key = 'AlphaBlend') then score := -100
             else if (key = 'GrayscaleToPaletteColor') then score := -100
             else if (key = 'Glowmap') then score := -100
             else if (key = 'BaseColor') then score := -100
@@ -943,6 +963,7 @@ begin
                                 controllerLink := controller.LinksTo;
                                 if Assigned(controllerLink) then continue;
                             end;
+                            if not ResourceExists(diffuse) then continue;
 
                             count := joCustomMaterials.O[matSuffix].O[diffuse].Count + 1;
 
