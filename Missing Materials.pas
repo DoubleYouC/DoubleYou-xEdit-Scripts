@@ -491,19 +491,19 @@ begin
                 end else if key = 'WetnessControl_SpecScale' then begin
                     bgsm.EditValues['WetnessControlSpecScale'] := joCustomMaterial.S[key];
                 end else if key = 'NormalTexture' then begin
-                    bgsm.EditValues['Textures\Normal'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\Normal'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'GlowTexture' then begin
-                    bgsm.EditValues['Textures\Glow'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\Glow'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'GrayscaleTexture' then begin
-                    bgsm.EditValues['Textures\Grayscale'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\Grayscale'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'DisplacementTexture' then begin
-                    bgsm.EditValues['Textures\Displacement'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\Displacement'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'EnvmapTexture' then begin
-                    bgsm.EditValues['Textures\Envmap'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\Envmap'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'InnerLayerTexture' then begin
-                    bgsm.EditValues['Textures\InnerLayer'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\InnerLayer'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'SmoothSpecTexture' then begin
-                    bgsm.EditValues['Textures\SmoothSpec'] := joCustomMaterial.S[key];
+                    bgsm.EditValues['Textures\SmoothSpec'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'RimPower' then begin
                     if joCustomMaterial.S[key] <> 'Max' then
                         bgsm.EditValues[key] := joCustomMaterial.S[key];
@@ -529,13 +529,13 @@ begin
             for i := 0 to Pred(joCustomMaterial.Count) do begin
                 key := joCustomMaterial.Names[i];
                 if key = 'NormalTexture' then begin
-                    bgem.EditValues['Textures\Normal'] := joCustomMaterial.S[key];
+                    bgem.EditValues['Textures\Normal'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'GrayscaleTexture' then begin
-                    bgem.EditValues['Textures\Grayscale'] := joCustomMaterial.S[key];
+                    bgem.EditValues['Textures\Grayscale'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'EnvmapTexture' then begin
-                    bgem.EditValues['Textures\Envmap'] := joCustomMaterial.S[key];
+                    bgem.EditValues['Textures\Envmap'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'EnvmapMaskTexture' then begin
-                    bgem.EditValues['Textures\EnvmapMask'] := joCustomMaterial.S[key];
+                    bgem.EditValues['Textures\EnvmapMask'] := TrimRightChars(joCustomMaterial.S[key], 9);
                 end else if key = 'nifs' then continue
                 else
                     bgem.EditValues[key] := joCustomMaterial.S[key];
