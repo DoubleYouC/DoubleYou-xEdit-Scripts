@@ -1070,8 +1070,8 @@ begin
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['NormalTexture'] := LowerCase(wbNormalizeResourceName(Textures[1].EditValue, resTexture));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GlowTexture'] := LowerCase(wbNormalizeResourceName(Textures[2].EditValue, resTexture));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['GrayscaleTexture'] := LowerCase(wbNormalizeResourceName(Textures[3].EditValue, resTexture));
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(Textures[4].EditValue, resTexture));
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(Textures[5].EditValue, resTexture));
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvmapTexture'] := LowerCase(wbNormalizeResourceName(Textures[4].EditValue, resTexture));
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DisplacementTexture'] := LowerCase(wbNormalizeResourceName(Textures[5].EditValue, resTexture));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['InnerLayerTexture'] := LowerCase(wbNormalizeResourceName(Textures[6].EditValue, resTexture));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SmoothSpecTexture'] := LowerCase(wbNormalizeResourceName(Textures[7].EditValue, resTexture));
 
