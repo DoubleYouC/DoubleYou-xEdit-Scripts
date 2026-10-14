@@ -710,7 +710,7 @@ begin
         Result := nil;
         Exit;
     end;
-    AddMessage(mess + Result + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
+    //AddMessage(mess + Result + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     if count > 1 then slMaterialsToVerify.Add(mess + Result + '"' + #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
     slAddedMat.Add(mess + Result + '"'+ #9 + 'Match Score: ' + IntToStr(bestScore) + '/' + IntToStr(total));
 end;
@@ -796,7 +796,7 @@ begin
                 mat := wbNormalizeResourceName(shaderProp.EditValues['Name'], resMaterial);
                 matExt := ExtractFileExt(mat);
                 blocknamehere := IntToStr(i) + ' ' + block.BlockType + '\' + shaderProp.BlockType;
-                AddMessage(model + #9 + blocknamehere);
+                //AddMessage(model + #9 + blocknamehere);
                 joCustomMaterial := TJsonObject.Create;
                 try
                     if (not (SameText(matExt, '.' + matSuffix))) or (not ResourceExists(mat)) then begin
@@ -957,12 +957,7 @@ begin
                             if not Assigned(TextureSet) then continue;
                             if TextureSet.BlockType <> 'BSShaderTextureSet' then continue;
                             Textures := TextureSet.Elements['Textures'];
-                            try
-                                diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
-                            except on E: Exception do
-                                AddMessage('Error: ' + E.Message);
-                                continue;
-                            end;
+                            diffuse := LowerCase(wbNormalizeResourceName(Textures[0].EditValue, resTexture));
                             if diffuse = '' then continue;
                             controller := shaderProp.Elements['Controller'];
                             if Assigned(controller) then begin
