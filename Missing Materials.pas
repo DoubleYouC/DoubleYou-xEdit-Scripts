@@ -466,6 +466,7 @@ var
     i, tileflags: integer;
 begin
     Result := '';
+    if joCustomMaterial.S['DoNotCreateMaterial'] = 'yes' then Exit;
     if shader = 'bgsm' then begin
         bgsm := TwbBGSMFile.Create;
         try
@@ -819,22 +820,54 @@ begin
                             if bHasAlpha then begin
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
-                                    //Alpha Blending 4333
-                                    if (NiAlphaPropFlags and 1) <> 0 then
+
+                                    if NiAlphaPropFlags = 4333 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
-                                    
-                                    //Alpha Testing 4844
-                                    if (NiAlphaPropFlags and 2) <> 0 then
+                                    end
+                                    else if NiAlphaPropFlags = 4844 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
-
-                                    //Alpha Blending and Testing Additive 4845
-                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 2) <> 0) then
+                                    end
+                                    else if NiAlphaPropFlags = 4845 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
-
-                                    //Alpha Blending Multiplicative 4137
-                                    //Alpha Blending    Source Blend Mode: Dst Color    Alpha Test Function: Greater
-                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 8) <> 0) and ((NiAlphaPropFlags and 4096) <> 0) then
+                                    end
+                                    else if NiAlphaPropFlags = 4137 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                    end
+                                    else if NiAlphaPropFlags = 37101 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                    end
+                                    else if NiAlphaPropFlags = 37612 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                    end
+                                    else if NiAlphaPropFlags = 37613 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+                                    end
+                                    else if NiAlphaPropFlags = 36905 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
+                                    end else begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DoNotCreateMaterial'] := 'yes';
+                                    end;
+
+                                    // //Alpha Blending 4333
+                                    // if (NiAlphaPropFlags and 1) <> 0 then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                    
+                                    // //Alpha Testing 4844
+                                    // if (NiAlphaPropFlags and 2) <> 0 then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+
+                                    // //Alpha Blending and Testing Additive 4845
+                                    // if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 2) <> 0) then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+
+                                    // //Alpha Blending Multiplicative 4137
+                                    // //Alpha Blending    Source Blend Mode: Dst Color    Alpha Test Function: Greater
+                                    // if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 8) <> 0) and ((NiAlphaPropFlags and 4096) <> 0) then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
 
                                     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTestRef'] := NiAlphaProp.EditValues['Threshold'];
                                 end;
@@ -973,22 +1006,56 @@ begin
                             if bHasAlpha then begin
                                 if Assigned(NiAlphaProp) then begin
                                     NiAlphaPropFlags := NiAlphaProp.NativeValues['Flags'];
-                                    //Alpha Blending 4333
-                                    if (NiAlphaPropFlags and 1) <> 0 then
+
+                                    if NiAlphaPropFlags = 4333 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
-                                    
-                                    //Alpha Testing 4844
-                                    if (NiAlphaPropFlags and 2) <> 0 then
+                                    end
+                                    else if NiAlphaPropFlags = 4844 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
-
-                                    //Alpha Blending and Testing Additive 4845
-                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 2) <> 0) then
+                                    end
+                                    else if NiAlphaPropFlags = 4845 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
-
-                                    //Alpha Blending Multiplicative 4137
-                                    //Alpha Blending    Source Blend Mode: Dst Color    Alpha Test Function: Greater
-                                    if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 8) <> 0) and ((NiAlphaPropFlags and 4096) <> 0) then
+                                    end
+                                    else if NiAlphaPropFlags = 4137 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                    end
+                                    else if NiAlphaPropFlags = 37101 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                    end
+                                    else if NiAlphaPropFlags = 37612 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                    end
+                                    else if NiAlphaPropFlags = 37613 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+                                    end
+                                    else if NiAlphaPropFlags = 36905 then begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
+                                    end else begin
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DoNotCreateMaterial'] := 'yes';
+                                    end;
+
+                                    // //Alpha Blending 4333
+                                    // if (NiAlphaPropFlags and 1) <> 0 then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                    
+                                    // //Alpha Testing 4844
+                                    // if (NiAlphaPropFlags and 2) <> 0 then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+
+                                    // //Alpha Blending and Testing Additive 4845
+                                    // if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 2) <> 0) then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+
+                                    // //Alpha Blending Multiplicative 4137
+                                    // //Alpha Blending    Source Blend Mode: Dst Color    Alpha Test Function: Greater
+                                    // if ((NiAlphaPropFlags and 1) <> 0) and ((NiAlphaPropFlags and 8) <> 0) and ((NiAlphaPropFlags and 4096) <> 0) then
+                                    //     joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
+
+                                    joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTestRef'] := NiAlphaProp.EditValues['Threshold'];
                                 end;
                             end;
 
