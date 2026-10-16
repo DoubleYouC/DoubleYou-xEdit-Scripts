@@ -49,7 +49,7 @@ begin
         end;
         ListStringsInStringList(slMaterialWarnings);
         CollectRecords;
-        //CheckModels;
+        CheckModels;
         ListStringsInStringList(slNifErrors);
         ListStringsInStringList(slMissingMaterials);
         // ListStringsInStringList(slNeedsMaterials);
@@ -580,32 +580,88 @@ procedure CollectRecords;
 }
 var
     i, j: integer;
-    model: string;
-
     f: IwbFile;
     g: IwbGroupRecord;
-    r: IwbElement;
+    r: IwbMainRecord;
+    model: string;
 begin
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
 
-        //Collect STAT
-        g := GroupBySignature(f, 'STAT');
+        //CheckGroup(f, 'STAT');
+        CheckGroup(f, 'ACTI', true);
+        CheckGroup(f, 'ADDN', false);
+        CheckGroup(f, 'AMMO', false);
+        CheckGroup(f, 'ANIO', false);
+        CheckGroup(f, 'ARTO', false);
+        CheckGroup(f, 'BOOK', false);
+        CheckGroup(f, 'CONT', true);
+        CheckGroup(f, 'DOOR', true);
+        CheckGroup(f, 'EXPL', false);
+        CheckGroup(f, 'FLOR', true);
+        CheckGroup(f, 'FURN', true);
+        CheckGroup(f, 'GRAS', false);
+        CheckGroup(f, 'HAZD', false);
+        CheckGroup(f, 'HDPT', false);
+        CheckGroup(f, 'IPCT', false);
+        CheckGroup(f, 'ALCH', false);
+        CheckGroup(f, 'KEYM', false);
+        CheckGroup(f, 'LIGH', false);
+        CheckGroup(f, 'MISC', true);
+        CheckGroup(f, 'MSTT', true);
+        CheckGroup(f, 'NOTE', false);
+        CheckGroup(f, 'OMOD', false);
+        CheckGroup(f, 'PROJ', false);
+        CheckGroup(f, 'TERM', false);
+        CheckGroup(f, 'WEAP', false);
+        CheckGroup(f, 'MSTT', false);
+
+        g := GroupBySignature(f, 'ARMA');
         for j := 0 to Pred(ElementCount(g)) do begin
             r := ElementByIndex(g, j);
             if not IsWinningOverride(r) then continue;
-            model := wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh);
-            if model = '' then continue;
-            if not (ReferencedByCount(r) > 0) then continue;
-            if not ResourceExists(model) then begin
-                AddMessage('Warning: STAT references a model that does not seem to exist: ' + ShortName(r) + #9 + model);
-                continue;
-            end;
-            if not IsEverUsed(r) then continue;
-            NifNeedsMaterial(model);
-            
-            slModelsToCheck.Add(model);
+
+            model := wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Male\MOD2'), resMesh);
+            CheckModel(r, model, bCheckRefs);
+            model := wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Female\MOD3'), resMesh);
+            CheckModel(r, model, bCheckRefs);
+            model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Male\MOD4'), resMesh);
+            CheckModel(r, model, bCheckRefs);
+            model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Female\MOD5'), resMesh);
+            CheckModel(r, model, bCheckRefs);
         end;
+    end;
+end;
+
+procedure CheckModel(r: IwbMainRecord; model: string; bCheckRefs: boolean);
+begin
+    if model = '' then Exit;
+    if not ResourceExists(model) then begin
+        AddMessage('Warning: Record references a model that does not seem to exist: ' + ShortName(r) + #9 + model);
+        Exit;
+    end;
+    if bCheckRefs then begin
+        if not (ReferencedByCount(r) > 0) then continue;
+        if not IsEverUsed(r) then continue;
+    end;
+    //NifNeedsMaterial(model);
+    slModelsToCheck.Add(model);
+end;
+
+procedure CheckGroup(f: IwbFile; sig: string; bCheckRefs: boolean);
+var
+    j: integer;
+    model: string;
+    g: IwbGroupRecord;
+    r: IwbMainRecord;
+begin
+    g := GroupBySignature(f, sig);
+    for j := 0 to Pred(ElementCount(g)) do begin
+        r := ElementByIndex(g, j);
+        if not IsWinningOverride(r) then continue;
+        model := wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh);
+
+        CheckModel(r, model, bCheckRefs);
     end;
 end;
 
@@ -803,7 +859,6 @@ begin
                     if (not (SameText(matExt, '.' + matSuffix))) or (not ResourceExists(mat)) then begin
                         slNeedsMaterials.Add('Model may need a ' + shaderProp.BlockType + ' material: ' + #9 + model + #9 + blockName);
                         bBlockMissingMat := True;
-                        Result := True;
                         if matSuffix = 'bgem' then begin
                             diffuse := LowerCase(wbNormalizeResourceName(shaderProp.EditValues['Source Texture'], resTexture));
                             if diffuse = '' then continue;
@@ -1260,6 +1315,7 @@ begin
             if bChanged then begin
                 EnsureDirectoryExists(sOutputDir + '\' + ExtractFilePath(model));
                 nif.SaveToFile(sOutputDir + '\' + model);
+                Result := True;
             end;
             nif.Free;
         end;
