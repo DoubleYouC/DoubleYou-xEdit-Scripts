@@ -622,13 +622,13 @@ begin
             if not IsWinningOverride(r) then continue;
 
             model := wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Male\MOD2'), resMesh);
-            CheckModel(r, model, bCheckRefs);
+            CheckModel(r, model, false);
             model := wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Female\MOD3'), resMesh);
-            CheckModel(r, model, bCheckRefs);
+            CheckModel(r, model, false);
             model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Male\MOD4'), resMesh);
-            CheckModel(r, model, bCheckRefs);
+            CheckModel(r, model, false);
             model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Female\MOD5'), resMesh);
-            CheckModel(r, model, bCheckRefs);
+            CheckModel(r, model, false);
         end;
     end;
 end;
@@ -641,8 +641,8 @@ begin
         Exit;
     end;
     if bCheckRefs then begin
-        if not (ReferencedByCount(r) > 0) then continue;
-        if not IsEverUsed(r) then continue;
+        if not (ReferencedByCount(r) > 0) then Exit;
+        if not IsEverUsed(r) then Exit;
     end;
     //NifNeedsMaterial(model);
     slModelsToCheck.Add(model);
@@ -741,6 +741,7 @@ begin
             then score := score + 1
             else if (key = 'TwoSided') and (y = 'yes') then score := -100
             else if (key = 'Decal') and (y = 'yes') then score := -100
+            else if (key = 'Tree') and (y = 'yes') then score := -100
             else if (key = 'UOffset') then score := -100
             else if (key = 'VOffset') then score := -100
             else if (key = 'UScale') then score := -100
