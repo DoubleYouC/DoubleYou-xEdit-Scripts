@@ -588,7 +588,7 @@ begin
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
 
-        //CheckGroup(f, 'STAT');
+        // CheckGroup(f, 'STAT', true);
         CheckGroup(f, 'ACTI', true);
         CheckGroup(f, 'ADDN', false);
         CheckGroup(f, 'AMMO', false);
