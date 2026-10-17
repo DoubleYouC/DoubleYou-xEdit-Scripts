@@ -4,7 +4,7 @@
 unit CheckSTATs;
 
 var
-    slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, 
+    slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slTreeAnimations,
     slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded: TStringList;
     sOutputDir: string;
     joTextureMswpMap, joCustomMaterials: TJsonObject;
@@ -35,6 +35,7 @@ begin
     slMaterialsAdded.Sorted := True;
     slMaterialWarnings := TStringList.Create;
     slMaterialWarnings.Sorted := True;
+    slTreeAnimations := TStringList.Create;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
@@ -57,6 +58,7 @@ begin
         ListStringsInStringList(slNeedsDecalFlag);
         ListStringsInStringList(slMaterialsToVerify);
         ListStringsInStringList(slMaterialsAdded);
+        ListStringsInStringList(slTreeAnimations);
 
         joCustomMaterials.SaveToFile(sOutputDir + '\joCustomMaterials.json', False, TEncoding.UTF8, True);
     finally
@@ -72,6 +74,7 @@ begin
         slModelsToCheck.Free;
         slMaterialsAdded.Free;
         slMaterialWarnings.Free;
+        slTreeAnimations.Free;
     end;
 end;
 
@@ -809,16 +812,18 @@ var
     BackLighting, uv, blocknamehere, clampMode, emitMult, BackLightPower, RefractionPower,
     GrayscaleToPaletteColor, RimPower, RimLighting, SpecularEnabled, SpecularMult, SpecularColor, Refraction,
     FalloffEnabled, SoftEnabled, EnvironmentMapping, EnvironmentMappingMaskScale: string;
-    bBlockMissingMat, bChanged, bHasShaderProperty, bHasAlpha: boolean;
+    bBlockMissingMat, bChanged, bHasShaderProperty, bHasAlpha, bHasTreeAnimations, bTree, bHasVertexColors: boolean;
 
     tsUV: TStrings;
     nif: TwbNifFile;
-    block, TextureSet, NiAlphaProp, controllerLink, prop, shaderProp: TwbNifBlock;
+    block, rootBlock, TextureSet, NiAlphaProp, controllerLink, prop, shaderProp: TwbNifBlock;
     Textures, TextureSetEle, AlphaPropEle, ShaderPropEle, controller: TdfElement;
     joCustomMaterial: TJsonObject;
 begin
     Result := False;
     bChanged := False;
+    bHasTreeAnimations := False;
+    bTree := False;
     //try
         nif := TwbNifFile.Create;
         try
@@ -829,8 +834,10 @@ begin
                 shaderProp := nil;
                 NiAlphaProp := nil;
                 TextureSet := nil;
+                bHasVertexColors := false;
                 diffuse := '';
                 block := nif.Blocks[i];
+                if i = 0 then rootBlock := block;
 
                 AlphaPropEle := block.Elements['Alpha Property'];
                 if Assigned(AlphaPropEle) then
@@ -849,15 +856,24 @@ begin
                 end else continue;
 
                 if not bHasShaderProperty then continue;
-                blockName := block.EditValues['Name'];
 
+                //Block has a shader property
+                blockName := block.EditValues['Name'];
+                blocknamehere := IntToStr(i) + ' ' + block.BlockType + '\' + shaderProp.BlockType;
+
+                //Get Material
                 mat := wbNormalizeResourceName(shaderProp.EditValues['Name'], resMaterial);
                 matExt := ExtractFileExt(mat);
-                blocknamehere := IntToStr(i) + ' ' + block.BlockType + '\' + shaderProp.BlockType;
+                
+
+                //Check for if the block uses vertex colors
+                if (block.EditValues['VertexDesc\VF\VF_COLORS'] = '1') then bHasVertexColors := True;
+
                 //AddMessage(model + #9 + blocknamehere);
                 joCustomMaterial := TJsonObject.Create;
                 try
                     if (not (SameText(matExt, '.' + matSuffix))) or (not ResourceExists(mat)) then begin
+                        //Material does not exist
                         slNeedsMaterials.Add('Model may need a ' + shaderProp.BlockType + ' material: ' + #9 + model + #9 + blockName);
                         bBlockMissingMat := True;
                         if matSuffix = 'bgem' then begin
@@ -1079,19 +1095,24 @@ begin
                                     end
                                     else if NiAlphaPropFlags = 37101 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Standard';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := 'yes';
                                     end
                                     else if NiAlphaPropFlags = 37612 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := 'yes';
                                     end
                                     else if NiAlphaPropFlags = 37613 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Additive';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := 'yes';
                                     end
                                     else if NiAlphaPropFlags = 36905 then begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaTest'] := 'yes';
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AlphaBlendMode'] := 'Multiplicative';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := 'yes';
                                     end else begin
                                         joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['DoNotCreateMaterial'] := 'yes';
+                                        joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := 'yes';
                                     end;
 
                                     // //Alpha Blending 4333
@@ -1242,6 +1263,7 @@ begin
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AnisoLighting'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Anisotropic_Lighting']);
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SkewSpecularAlpha'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Skew_Specular_Alpha']);
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Tree'] := IntToYesNo(shaderProp.NativeValues['Shader Flags 2\Tree_Anim']);
+                            if shaderProp.EditValues['Shader Flags 2\Tree_Anim'] = '1' then bHasTreeAnimations := True;
 
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].A['nifs'].Add(model);
                             
@@ -1265,7 +1287,6 @@ begin
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['AssumeShadowmask'] := shaderProp.EditValues['AssumeShadowmask'];
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['CustomPorosity'] := shaderProp.EditValues['CustomPorosity'];
                             
-                            // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnableEditorAlphaRef'] := shaderProp.EditValues['EnableEditorAlphaRef'];
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingWindow'] := shaderProp.EditValues['EnvironmentMappingWindow'];
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['PBR'] := shaderProp.EditValues['PBR'];
                             // joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['ReceiveShadows'] := shaderProp.EditValues['ReceiveShadows'];
@@ -1303,15 +1324,31 @@ begin
                             slAddedMat.Add(mess + matPath + '"');
                         end else begin
                             IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, blocknamehere, matPath);
+                            bHasTreeAnimations := DoesMatHaveTreeAnimations(matPath);
                         end;
                         shaderProp.EditValues['Name'] := matPath;
                         mat := matPath;
                         bChanged := true;
+                    end else begin
+                        //material exists
+                        bHasTreeAnimations := DoesMatHaveTreeAnimations(mat);
+                    end;
+                    if bHasTreeAnimations then begin
+                        //If the shader specifies tree animations, check for vertex colors and BSLeafAnimNode
+                        if (bHasTreeAnimations and not bHasVertexColors) then begin
+                            slTreeAnimations.Add(model + #9 + blocknamehere + #9 + 'WARNING! Trishape has tree animations but no vertex colors.');
+                        end else if (bHasTreeAnimations and not bTree) then bTree := True;
                     end;
                     CheckForMaterialMismatch(shaderProp, bChanged, mat, matExt, model, blocknamehere);
                 finally
                     joCustomMaterial.Free;
                 end;
+            end;
+            if bTree and SameText(rootBlock.BlockType, 'NiNode') then begin
+                nif.ConvertBlock(0, 'BSLeafAnimNode');
+                bChanged := True;
+                blockName := block.EditValues['Name'];
+                slTreeAnimations.Add(model + #9 + '0 NiNode\' + blockName + ' was converted to BSLeafAnimNode.');
             end;
         finally
             if bChanged then begin
@@ -1326,6 +1363,9 @@ begin
 end;
 
 procedure CheckForMaterialMismatch(var shaderProp: TwbNifBlock; var bChanged: boolean; const mat, matExt, model, blocknamehere: string);
+{
+    Fix Shader flags that need to be set the same as the material.
+}
 var
     bgsm: TwbBGSMFile;
 begin
@@ -1342,6 +1382,23 @@ begin
         end;
     finally
         bgsm.Free;
+    end;
+end;
+
+function DoesMatHaveTreeAnimations(mat: string): boolean;
+{
+    Checks a material to see if Tree flag is enabled.
+}
+var
+    bgsm: TwbBGSMFile;
+begin
+    Result := False;
+    bgsm := TwbBGSMFile.Create;
+    try
+        bgsm.LoadFromResource(mat);
+        if SameText(bgsm.EditValues['Tree'], 'yes') then Result := True;
+    finally
+        bgsm.free;
     end;
 end;
 
@@ -1388,6 +1445,9 @@ begin
 end;
 
 function IntToYesNo(i: integer): string;
+{
+    Turns an integer into a yes/no based on if it is 0 or not.
+}
 begin
     if i <> 0 then Result := 'yes' else Result := 'no';
 end;
