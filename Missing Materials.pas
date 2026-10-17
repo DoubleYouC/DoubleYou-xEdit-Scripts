@@ -744,11 +744,11 @@ begin
             else if (key = 'Tree') and (y = 'yes') then score := -100
             else if (key = 'UOffset') then score := -100
             else if (key = 'VOffset') then score := -100
+            else if (key = 'Alpha') then score := -100
             else if (key = 'UScale') then score := -100
             else if (key = 'VScale') then score := -100
             else if (key = 'AlphaTest') then score := -100
-            // else if (key = 'Alpha') then score := -100
-            // else if (key = 'AlphaBlend') then score := -100
+            else if (key = 'AlphaBlend') then score := -100
             else if (key = 'GrayscaleToPaletteColor') then score := -100
             else if (key = 'Glowmap') then score := -100
             else if (key = 'BaseColor') then score := -100
@@ -1305,6 +1305,7 @@ begin
                             IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, blocknamehere, matPath);
                         end;
                         shaderProp.EditValues['Name'] := matPath;
+                        mat := matPath;
                         bChanged := true;
                     end;
                     CheckForMaterialMismatch(shaderProp, bChanged, mat, matExt, model, blocknamehere);
