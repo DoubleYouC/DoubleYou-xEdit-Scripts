@@ -5,10 +5,18 @@ unit CheckSTATs;
 
 var
     slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slTreeAnimations,
-    slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded, slMaterialFixes: TStringList;
-    sOutputDir, sFixedMaterialsOutput: string;
-    joTextureMswpMap, joCustomMaterials: TJsonObject;
+    slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded,
+    slMaterialFixes, slUsedMaterials, slAllMaterials, slUnusedMaterials, slAffectedSCOL: TStringList;
 
+    sOutputDir, sFixedMaterialsOutput: string;
+    joTextureMswpMap, joCustomMaterials, joModelRecord: TJsonObject;
+
+const
+    bSaveModels = false;
+    bSaveMaterials = false;
+    bSaveNewMaterials = false;
+    bProcessStats = true;
+    bProcessNonStats = true;
 
 function Initialize: integer;
 {
@@ -39,9 +47,18 @@ begin
     slTreeAnimations.Sorted := True;
     slMaterialFixes := TStringList.Create;
     slMaterialFixes.Sorted := True;
+    slUsedMaterials := TStringList.Create;
+    slUsedMaterials.Sorted := True;
+    slAllMaterials := TStringList.Create;
+    slAllMaterials.Sorted := True;
+    slUnusedMaterials := TStringList.Create;
+    slUnusedMaterials.Sorted := True;
+    slAffectedSCOL := TStringList.Create;
+    slAffectedSCOL.Sorted := True;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
+    joModelRecord := TJsonObject.Create;
     try
         sOutputDir :=  wbScriptsPath + 'FixModels\output';
         sFixedMaterialsOutput := sOutputDir + '\FixedMaterials';
@@ -53,19 +70,38 @@ begin
             joTextureMswpMap.LoadFromFile(sOutputDir + '\joTextureMswpMap.json');
         end;
         ListStringsInStringList(slMaterialWarnings);
+        slMaterialWarnings.SaveToFile(sOutputDir + '\Material Warnings.txt');
         ListStringsInStringList(slMaterialFixes);
+        slMissingMaterials.SaveToFile(sOutputDir + '\Material Fixes.txt');
+
         CollectRecords;
+        // sOutputDir was created in FilesInContainers
+        joModelRecord.SaveToFile(sOutputDir + '\joModelRecord.json', False, TEncoding.UTF8, True);
+
         CheckModels;
+
         ListStringsInStringList(slNifErrors);
         ListStringsInStringList(slMissingMaterials);
+        slMissingMaterials.SaveToFile(sOutputDir + '\Missing Materials.txt');
         // ListStringsInStringList(slNeedsMaterials);
         ListStringsInStringList(slAddedMat);
+        slAddedMat.SaveToFile(sOutputDir + '\Models Assigned Materials.txt');
         ListStringsInStringList(slNeedsDecalFlag);
+        slNeedsDecalFlag.SaveToFile(sOutputDir + '\Added Decal Flag.txt');
         ListStringsInStringList(slMaterialsToVerify);
+        slMaterialsToVerify.SaveToFile(sOutputDir + '\Models Assigned Materials - Verify.txt');
         ListStringsInStringList(slMaterialsAdded);
+        slMaterialsAdded.SaveToFile(sOutputDir + '\Materials Added.txt');
         ListStringsInStringList(slTreeAnimations);
+        slTreeAnimations.SaveToFile(sOutputDir + '\Tree Animations.txt');
+        slAffectedSCOL.SaveToFile(sOutputDir + '\Affected SCOLs.txt');
 
+        // sOutputDir was created in FilesInContainers
         joCustomMaterials.SaveToFile(sOutputDir + '\joCustomMaterials.json', False, TEncoding.UTF8, True);
+
+        slUnusedMaterials.Assign(slAllMaterials);
+        slUnusedmaterials.Difference(slUsedMaterials);
+        slUnusedMaterials.SaveToFile(sOutputDir + '\Unused Materials.txt');
     finally
         slMissingMaterials.Free;
         slNifErrors.Free;
@@ -76,11 +112,16 @@ begin
         slMaterialsToVerify.Free;
         joTextureMswpMap.Free;
         joCustomMaterials.Free;
+        joModelRecord.Free;
         slModelsToCheck.Free;
         slMaterialsAdded.Free;
         slMaterialWarnings.Free;
         slTreeAnimations.Free;
         slMaterialFixes.Free;
+        slUsedMaterials.Free;
+        slAllMaterials.Free;
+        slUnusedMaterials.Free;
+        slAffectedSCOL.Free;
     end;
 end;
 
@@ -512,7 +553,7 @@ begin
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTransmissiveScale'] := bgsm.EditValues['TranslucencyTransmissiveScale'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTurbulence'] := bgsm.EditValues['TranslucencyTurbulence'];
                 finally
-                    if bChanged then begin
+                    if bChanged and bSaveMaterials then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgsm.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
@@ -637,13 +678,14 @@ begin
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingTexture'] := bgem.EditValues['Textures\Lighting'];
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SpecularTexture'] := bgem.EditValues['Textures\Specular'];
                 finally
-                    if bChanged then begin
+                    if bChanged and bSaveMaterials then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgem.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
                     bgem.Free;
                 end;
-            end;
+            end else continue;
+            slAllMaterials.Add(f);
         end;
     finally
         EnsureDirectoryExists(sOutputDir);
@@ -660,6 +702,7 @@ var
     i, tileflags: integer;
 begin
     Result := '';
+    if not bSaveNewMaterials then Exit;
     if joCustomMaterial.S['DoNotCreateMaterial'] = 'yes' then Exit;
     if shader = 'bgsm' then begin
         bgsm := TwbBGSMFile.Create;
@@ -782,7 +825,8 @@ begin
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
 
-        // CheckGroup(f, 'STAT', true);
+        if bProcessStats then CheckGroup(f, 'STAT', true);
+        if not bProcessNonStats then continue;
         CheckGroup(f, 'ACTI', true);
         CheckGroup(f, 'ADDN', false);
         CheckGroup(f, 'AMMO', false);
@@ -828,18 +872,24 @@ begin
 end;
 
 procedure CheckModel(r: IwbMainRecord; model: string; bCheckRefs: boolean);
+var
+    bEverUsed: boolean;
 begin
     if model = '' then Exit;
+    bEverUsed := false;
     if not ResourceExists(model) then begin
         AddMessage('Warning: Record references a model that does not seem to exist: ' + ShortName(r) + #9 + model);
         Exit;
     end;
     if bCheckRefs then begin
         if not (ReferencedByCount(r) > 0) then Exit;
-        if not IsEverUsed(r) then Exit;
+        bEverUsed := IsEverUsed(r, model);
+        if not bEverUsed then Exit;
     end;
     //NifNeedsMaterial(model);
     slModelsToCheck.Add(model);
+    joModelRecord.O[model].A['records'].Add(RecordFormIdFileId(r));
+    if bEverUsed then joModelRecord.O[model].S['Used'] := true;
 end;
 
 procedure CheckGroup(f: IwbFile; sig: string; bCheckRefs: boolean);
@@ -853,6 +903,7 @@ begin
     for j := 0 to Pred(ElementCount(g)) do begin
         r := ElementByIndex(g, j);
         if not IsWinningOverride(r) then continue;
+        AddMessage(ShortName(r));
         model := wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh);
 
         CheckModel(r, model, bCheckRefs);
@@ -870,14 +921,25 @@ begin
     end;
 end;
 
-function IsEverUsed(s: IwbMainRecord): boolean;
+function IsEverUsed(const s: IwbMainRecord; const model: string): boolean;
 var
     i: integer;
     r: IwbMainRecord;
+    sig: string;
+    bIsSCOLEverUsed: boolean;
 begin
     Result := false;
+    sig := Signature(s);
     for i := Pred(ReferencedByCount(s)) downto 0 do begin
         r := ReferencedByIndex(s, i);
+        // if Signature(r) = 'SCOL' then begin
+        //     AddMessage(ShortName(r));
+        //     bIsSCOLEverUsed := IsEverUsed(s, model);
+        //     if not bIsSCOLEverUsed then continue;
+        //     Result := true;
+        //     joModelRecord.O[model].A['SCOL'].Add(RecordFormIdFileId(r));
+        //     joModelRecord.O[model].S['bSCOL'] := '1';
+        // end;
         if Signature(r) <> 'REFR' then continue;
         if not IsWinningOverride(r) then continue;
         if GetIsDeleted(r) then continue;
@@ -885,6 +947,7 @@ begin
         //if not IsRefPrecombined(r) then continue;
         Result := true;
         break;
+        // if sig <> 'STAT' then break;
     end;
 end;
 
@@ -998,7 +1061,7 @@ end;
 
 function NifNeedsMaterial(model: string): boolean;
 var
-    i, count, NiAlphaPropFlags: integer;
+    i, count, NiAlphaPropFlags, s: integer;
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, emit, emitColor, 
     BackLighting, uv, blocknamehere, clampMode, emitMult, BackLightPower, RefractionPower,
     GrayscaleToPaletteColor, RimPower, RimLighting, SpecularEnabled, SpecularMult, SpecularColor, Refraction,
@@ -1522,6 +1585,7 @@ begin
                         bChanged := true;
                     end else begin
                         //material exists
+                        slUsedMaterials.Add(mat);
                         bHasTreeAnimations := DoesMatHaveTreeAnimations(mat);
                     end;
                     if bHasTreeAnimations then begin
@@ -1542,10 +1606,15 @@ begin
                 slTreeAnimations.Add(model + #9 + '0 NiNode\' + blockName + ' was converted to BSLeafAnimNode.');
             end;
         finally
-            if bChanged then begin
+            if bChanged and bSaveModels then begin
                 EnsureDirectoryExists(sOutputDir + '\' + ExtractFilePath(model));
                 nif.SaveToFile(sOutputDir + '\' + model);
                 Result := True;
+                if joModelRecord.O[model].S['bSCOL'] = '1' then begin
+                    for s := 0 to Pred(joModelRecord.O[model].A['SCOL'].Count) do begin
+                        slAffectedSCOL.Add(joModelRecord.O[model].A['SCOL'].S[s]);
+                    end;
+                end;
             end;
             nif.Free;
         end;
@@ -1592,6 +1661,29 @@ begin
     finally
         bgsm.free;
     end;
+end;
+
+function RecordFormIdFileId(e: IwbMainRecord): string;
+{
+    Returns the record ID of an element.
+}
+begin
+    e := MasterOrSelf(e);
+    Result := IntToHex(FormID(e), 8) + ':' + GetFileName(GetFile(e));
+end;
+
+function GetRecordFromFormIdFileId(recordId: string): IwbMainRecord;
+{
+    Returns the record from the given formid:filename.
+}
+var
+    colonPos, recordFormId: integer;
+    f: IwbFile;
+begin
+    colonPos := Pos(':', recordId);
+    recordFormId := StrToInt('$' + Copy(recordId, 1, Pred(colonPos)));
+    f := FileByName(Copy(recordId, Succ(colonPos), Length(recordId)));
+    Result := RecordByFormID(f, recordFormId, False);
 end;
 
 procedure ListStringsInStringList(sl: TStringList);
