@@ -871,7 +871,7 @@ begin
     end;
 end;
 
-procedure CheckModel(r: IwbMainRecord; model: string; bCheckRefs: boolean);
+procedure CheckModel(const r: IwbMainRecord; const model, sig: string; const bCheckRefs: boolean);
 var
     bEverUsed: boolean;
 begin
@@ -883,16 +883,16 @@ begin
     end;
     if bCheckRefs then begin
         if not (ReferencedByCount(r) > 0) then Exit;
-        bEverUsed := IsEverUsed(r, model);
+        bEverUsed := IsEverUsed(r, model, sig);
         if not bEverUsed then Exit;
     end;
     //NifNeedsMaterial(model);
     slModelsToCheck.Add(model);
-    joModelRecord.O[model].A['records'].Add(RecordFormIdFileId(r));
+    joModelRecord.O[model].A['records'].Add(ShortName(r));
     if bEverUsed then joModelRecord.O[model].S['Used'] := true;
 end;
 
-procedure CheckGroup(f: IwbFile; sig: string; bCheckRefs: boolean);
+procedure CheckGroup(const f: IwbFile; const sig: string; const bCheckRefs: boolean);
 var
     j: integer;
     model: string;
@@ -906,7 +906,7 @@ begin
         AddMessage(ShortName(r));
         model := wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh);
 
-        CheckModel(r, model, bCheckRefs);
+        CheckModel(r, model, sig, bCheckRefs);
     end;
 end;
 
@@ -921,33 +921,33 @@ begin
     end;
 end;
 
-function IsEverUsed(const s: IwbMainRecord; const model: string): boolean;
+function IsEverUsed(const s: IwbMainRecord; const model, sig: string): boolean;
 var
     i: integer;
     r: IwbMainRecord;
-    sig: string;
     bIsSCOLEverUsed: boolean;
+    rSig: string;
 begin
     Result := false;
-    sig := Signature(s);
     for i := Pred(ReferencedByCount(s)) downto 0 do begin
         r := ReferencedByIndex(s, i);
-        // if Signature(r) = 'SCOL' then begin
-        //     AddMessage(ShortName(r));
-        //     bIsSCOLEverUsed := IsEverUsed(s, model);
-        //     if not bIsSCOLEverUsed then continue;
-        //     Result := true;
-        //     joModelRecord.O[model].A['SCOL'].Add(RecordFormIdFileId(r));
-        //     joModelRecord.O[model].S['bSCOL'] := '1';
-        // end;
+        rSig := Signature(r);
+        if SameText(rSig, 'SCOL') then begin
+            AddMessage(ShortName(r));
+            bIsSCOLEverUsed := IsEverUsed(r, model, rSig);
+            if not bIsSCOLEverUsed then continue;
+            Result := true;
+            joModelRecord.O[model].A['SCOL'].Add(RecordFormIdFileId(r));
+            joModelRecord.O[model].S['bSCOL'] := '1';
+        end;
         if Signature(r) <> 'REFR' then continue;
         if not IsWinningOverride(r) then continue;
         if GetIsDeleted(r) then continue;
         if GetIsCleanDeleted(r) then continue;
         //if not IsRefPrecombined(r) then continue;
         Result := true;
-        break;
-        // if sig <> 'STAT' then break;
+        //break;
+        if sig <> 'STAT' then break;
     end;
 end;
 
