@@ -102,6 +102,8 @@ begin
         slUnusedMaterials.Assign(slAllMaterials);
         slUnusedmaterials.Difference(slUsedMaterials);
         slUnusedMaterials.SaveToFile(sOutputDir + '\Unused Materials.txt');
+        slUsedMaterials.SaveToFile(sOutputDir + '\Used Materials.txt');
+        slAllMaterials.SaveToFile(sOutputDir + '\All Materials.txt');
     finally
         slMissingMaterials.Free;
         slNifErrors.Free;
@@ -685,7 +687,7 @@ begin
                     bgem.Free;
                 end;
             end else continue;
-            slAllMaterials.Add(f);
+            slAllMaterials.Add(LowerCase(f));
         end;
     finally
         EnsureDirectoryExists(sOutputDir);
@@ -904,7 +906,7 @@ begin
         r := ElementByIndex(g, j);
         if not IsWinningOverride(r) then continue;
         AddMessage(ShortName(r));
-        model := wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh);
+        model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh));
 
         CheckModel(r, model, sig, bCheckRefs);
     end;
@@ -1585,7 +1587,7 @@ begin
                         bChanged := true;
                     end else begin
                         //material exists
-                        slUsedMaterials.Add(mat);
+                        slUsedMaterials.Add(LowerCase(mat));
                         bHasTreeAnimations := DoesMatHaveTreeAnimations(mat);
                     end;
                     if bHasTreeAnimations then begin
