@@ -861,13 +861,13 @@ begin
             r := ElementByIndex(g, j);
             if not IsWinningOverride(r) then continue;
 
-            model := wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Male\MOD2'), resMesh);
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Male\MOD2'), resMesh));
             CheckModel(r, model, 'ARMA', false);
-            model := wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Female\MOD3'), resMesh);
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Biped Model\Female\MOD3'), resMesh));
             CheckModel(r, model, 'ARMA', false);
-            model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Male\MOD4'), resMesh);
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Male\MOD4'), resMesh));
             CheckModel(r, model, 'ARMA', false);
-            model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Female\MOD5'), resMesh);
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Female\MOD5'), resMesh));
             CheckModel(r, model, 'ARMA', false);
         end;
 
