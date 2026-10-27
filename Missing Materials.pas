@@ -870,6 +870,35 @@ begin
             model := wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Female\MOD5'), resMesh);
             CheckModel(r, model, 'ARMA', false);
         end;
+
+        g := GroupBySignature(f, 'MSWP');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+            if not ReferencedByCount(r) > 0 then continue;
+            ProcessMaterialSwap(r);
+        end;
+    end;
+end;
+
+procedure ProcessMaterialSwap(const r: IwbMainRecord);
+var
+    i: integer;
+    substitutions, sub: IwbElement;
+    originalMat, replacementMat: string;
+begin
+    substitutions := ElementByName(r, 'Material Substitutions');
+    for i := 0 to Pred(ElementCount(substitutions)) do begin
+        sub := ElementByIndex(substitutions, i);
+        if not ElementExists(sub, 'BNAM - Original Material') then continue;
+        if not ElementExists(sub, 'SNAM - Replacement Material') then continue;
+        originalMat := LowerCase(wbNormalizeResourceName(GetElementEditValues(sub, 'BNAM - Original Material'), resMaterial));
+        if originalMat = '' then continue;
+        replacementMat := LowerCase(wbNormalizeResourceName(GetElementEditValues(sub, 'SNAM - Replacement Material'), resMaterial));
+        if replacementMat = '' then continue;
+        if not ResourceExists(originalMat) then continue;
+        if not ResourceExists(replacementMat) then continue;
+        slUsedMaterials.Add(replacementMat);
     end;
 end;
 
