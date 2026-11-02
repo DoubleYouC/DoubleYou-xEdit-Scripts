@@ -12,11 +12,11 @@ var
     joTextureMswpMap, joCustomMaterials, joModelRecord: TJsonObject;
 
 const
-    bSaveModels = false;
-    bSaveMaterials = false;
-    bSaveNewMaterials = false;
+    bSaveModels = true;
+    bSaveMaterials = true;
+    bSaveNewMaterials = true;
     bProcessStats = true;
-    bProcessNonStats = true;
+    bProcessNonStats = false;
 
 function Initialize: integer;
 {
@@ -818,43 +818,93 @@ procedure CollectRecords;
     Collect records.
 }
 var
-    i, j: integer;
+    i, j, k: integer;
     f: IwbFile;
     g: IwbGroupRecord;
     r: IwbMainRecord;
-    model: string;
+    destStages: IwbElement;
+    model, material: string;
 begin
     for i := 0 to Pred(FileCount) do begin
         f := FileByIndex(i);
 
         if bProcessStats then CheckGroup(f, 'STAT', true);
         if not bProcessNonStats then continue;
-        CheckGroup(f, 'ACTI', true);
+        CheckGroupDestructible(f, 'ACTI', false);
         CheckGroup(f, 'ADDN', false);
-        CheckGroup(f, 'AMMO', false);
+        CheckGroupDestructible(f, 'AMMO', false);
         CheckGroup(f, 'ANIO', false);
         CheckGroup(f, 'ARTO', false);
-        CheckGroup(f, 'BOOK', false);
-        CheckGroup(f, 'CONT', true);
-        CheckGroup(f, 'DOOR', true);
+        CheckGroup(f, 'BPTD', false);
+        CheckGroupDestructible(f, 'BOOK', false);
+        CheckGroup(f, 'CAMS', false);
+        CheckGroup(f, 'CLMT', false);
+        CheckGroupDestructible(f, 'CONT', true);
+        CheckGroupDestructible(f, 'DOOR', true);
+        CheckGroup(f, 'EFSH', false);
         CheckGroup(f, 'EXPL', false);
-        CheckGroup(f, 'FLOR', true);
-        CheckGroup(f, 'FURN', true);
+        CheckGroupDestructible(f, 'FLOR', false);
+        CheckGroupDestructible(f, 'FURN', true);
         CheckGroup(f, 'GRAS', false);
         CheckGroup(f, 'HAZD', false);
         CheckGroup(f, 'HDPT', false);
+        CheckGroup(f, 'IDLM', false);
         CheckGroup(f, 'IPCT', false);
-        CheckGroup(f, 'ALCH', false);
-        CheckGroup(f, 'KEYM', false);
-        CheckGroup(f, 'LIGH', false);
-        CheckGroup(f, 'MISC', true);
-        CheckGroup(f, 'MSTT', true);
+        CheckGroupDestructible(f, 'ALCH', false);
+        CheckGroupDestructible(f, 'KEYM', false);
+        CheckGroupDestructible(f, 'LIGH', false);
+        CheckGroup(f, 'LVLN', false);
+        CheckGroup(f, 'MATO', false);
+        CheckGroupDestructible(f, 'MISC', true);
+        CheckGroupDestructible(f, 'MSTT', true);
         CheckGroup(f, 'NOTE', false);
         CheckGroup(f, 'OMOD', false);
-        CheckGroup(f, 'PROJ', false);
+        CheckGroupDestructible(f, 'PROJ', false);
+        CheckGroupDestructible(f, 'TACT', false);
         CheckGroup(f, 'TERM', false);
-        CheckGroup(f, 'WEAP', false);
-        CheckGroup(f, 'MSTT', false);
+        CheckGroupDestructible(f, 'WEAP', false);
+
+        g := GroupBySignature(f, 'RACE');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'ANAM - Male Skeletal Model'), resMesh));
+            CheckModel(r, model, 'RACE', false);
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'ANAM - Female Skeletal Model'), resMesh));
+            CheckModel(r, model, 'RACE', false);
+        end;
+
+        g := GroupBySignature(f, 'WTHR');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Aurora\Model\MODL'), resMesh));
+            CheckModel(r, model, 'WTHR', false);
+        end;
+
+        g := GroupBySignature(f, 'SPGD');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+
+            material := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'MNAM'), resMaterial));
+            if not ResourceExists(material) then continue;
+            slAllMaterials.Add(material);
+            slUsedMaterials.Add(material);
+        end;
+
+        g := GroupBySignature(f, 'TXST');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+
+            material := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'MNAM'), resMaterial));
+            if not ResourceExists(material) then continue;
+            slAllMaterials.Add(material);
+            slUsedMaterials.Add(material);
+        end;
 
         g := GroupBySignature(f, 'ARMA');
         for j := 0 to Pred(ElementCount(g)) do begin
@@ -869,6 +919,24 @@ begin
             CheckModel(r, model, 'ARMA', false);
             model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, '1st Person\Female\MOD5'), resMesh));
             CheckModel(r, model, 'ARMA', false);
+        end;
+
+        g := GroupBySignature(f, 'ARMO');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Male\World Model\MOD2'), resMesh));
+            CheckModel(r, model, 'ARMO', false);
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Female\World Model\MOD4'), resMesh));
+            CheckModel(r, model, 'ARMO', false);
+
+            if not ElementExists(r, 'Destructible') then continue;
+            destStages := ElementByPath(r, 'Destructible\Stages');
+            for k := 0 to Pred(ElementCount(destStages)) do begin
+                model := LowerCase(wbNormalizeResourceName(GetElementEditValues(ElementByIndex(destStages, k), 'Model\DMDL'), resMesh));
+                CheckModel(r, model, 'ARMO', false);
+            end;
         end;
 
         g := GroupBySignature(f, 'MSWP');
@@ -892,9 +960,9 @@ begin
         sub := ElementByIndex(substitutions, i);
         if not ElementExists(sub, 'BNAM - Original Material') then continue;
         if not ElementExists(sub, 'SNAM - Replacement Material') then continue;
-        originalMat := LowerCase(wbNormalizeResourceName(GetElementEditValues(sub, 'BNAM - Original Material'), resMaterial));
+        originalMat := LowerCase(NormalizeResourceNameFixed(GetElementEditValues(sub, 'BNAM - Original Material'), resMaterial));
         if originalMat = '' then continue;
-        replacementMat := LowerCase(wbNormalizeResourceName(GetElementEditValues(sub, 'SNAM - Replacement Material'), resMaterial));
+        replacementMat := LowerCase(NormalizeResourceNameFixed(GetElementEditValues(sub, 'SNAM - Replacement Material'), resMaterial));
         if replacementMat = '' then continue;
         if not ResourceExists(originalMat) then continue;
         if not ResourceExists(replacementMat) then continue;
@@ -938,6 +1006,31 @@ begin
         model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh));
 
         CheckModel(r, model, sig, bCheckRefs);
+    end;
+end;
+
+procedure CheckGroupDestructible(const f: IwbFile; const sig: string; const bCheckRefs: boolean);
+var
+    j, k: integer;
+    model: string;
+    g: IwbGroupRecord;
+    r: IwbMainRecord;
+    destStages: IwbElement;
+begin
+    g := GroupBySignature(f, sig);
+    for j := 0 to Pred(ElementCount(g)) do begin
+        r := ElementByIndex(g, j);
+        if not IsWinningOverride(r) then continue;
+        AddMessage(ShortName(r));
+        model := LowerCase(wbNormalizeResourceName(GetElementEditValues(r, 'Model\MODL'), resMesh));
+        CheckModel(r, model, sig, bCheckRefs);
+
+        if not ElementExists(r, 'Destructible') then continue;
+        destStages := ElementByPath(r, 'Destructible\Stages');
+        for k := 0 to Pred(ElementCount(destStages)) do begin
+            model := LowerCase(wbNormalizeResourceName(GetElementEditValues(ElementByIndex(destStages, k), 'Model\DMDL'), resMesh));
+            CheckModel(r, model, sig, bCheckRefs);
+        end;
     end;
 end;
 
@@ -1785,6 +1878,19 @@ function BoolToStr(b: boolean): string;
 }
 begin
     if b then Result := 'true' else Result := 'false';
+end;
+
+function NormalizeResourceNameFixed(f: string; resType: TGameResourceType): string;
+{
+    Normalizes a resource name to the correct format for the given resource type.
+}
+var
+    newf: string;
+begin
+    newf := StringReplace(f, '*', 'THERE-WAS-AN-ASTERISK-HERE', [rfReplaceAll, rfIgnoreCase]);
+    newf := wbNormalizeResourceName(newf, resType);
+    newf := StringReplace(newf, 'THERE-WAS-AN-ASTERISK-HERE', '*', [rfReplaceAll, rfIgnoreCase]);
+    Result := newf;
 end;
 
 end.
