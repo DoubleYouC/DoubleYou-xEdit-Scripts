@@ -72,7 +72,7 @@ begin
         ListStringsInStringList(slMaterialWarnings);
         slMaterialWarnings.SaveToFile(sOutputDir + '\Material Warnings.txt');
         ListStringsInStringList(slMaterialFixes);
-        slMissingMaterials.SaveToFile(sOutputDir + '\Material Fixes.txt');
+        slMaterialFixes.SaveToFile(sOutputDir + '\Material Fixes.txt');
 
         CollectRecords;
         // sOutputDir was created in FilesInContainers
