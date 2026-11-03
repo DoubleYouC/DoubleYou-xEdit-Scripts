@@ -64,7 +64,7 @@ begin
     try
         sOutputDir :=  wbScriptsPath + 'FixModels\output';
         sFixedMaterialsOutput := sOutputDir + '\FixedMaterials';
-        if FileExists(sOutputDir + '\Unused Materials.txt') then
+        if FileExists(wbScriptsPath + 'FixModels\Unused Materials.txt') then
             slUnusedMaterials.LoadFromFile(wbScriptsPath + 'FixModels\Unused Materials.txt');
 
         if not FileExists(sOutputDir + '\joTextureMswpMap.json') then begin
@@ -147,7 +147,7 @@ var
     GlowTexture, WetnessControl_EnvMapScale, DisplacementTexture, InnerLayerTexture, EnvmapMaskTexture, NewEnvmapTexture, RootMaterialPath: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
-    bChanged, bEverUsesEnvironmentMapping: boolean;
+    bChanged, bEverUsesEnvironmentMapping, bBadDiffuse: boolean;
 begin
     slArchivedFiles := TStringList.Create;
     slArchivedFiles.Sorted := True;
@@ -159,6 +159,7 @@ begin
             bChanged := false;
             bEverUsesEnvironmentMapping := false;
             testTexture := '';
+            bBadDiffuse := False;
             f := slArchivedFiles[i];
             ext := ExtractFileExt(f);
             if SameText(ext, '.bgsm') then begin
@@ -169,11 +170,12 @@ begin
                     diffuse := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Diffuse'], resTexture));
                     if diffuse <> '' then if not ResourceExists(diffuse) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a diffuse texture that does not exist:' + #9 + diffuse);
+                        bBadDiffuse := true;
                         // If the diffuse doesn't exist, good likelihood the material is never used.
-                        slMaterialFixes.Add(f + #9 + 'Textures\Diffuse was changed to blank due to missing texture' + #9 + diffuse);
-                        bgsm.EditValues['Textures\Diffuse'] := '';
-                        diffuse := '';
-                        bChanged := true;
+                        // slMaterialFixes.Add(f + #9 + 'Textures\Diffuse was changed to blank due to missing texture' + #9 + diffuse);
+                        // bgsm.EditValues['Textures\Diffuse'] := '';
+                        // diffuse := '';
+                        // bChanged := true;
                     end;
                     NormalTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
 
@@ -181,7 +183,7 @@ begin
                     if EnvmapTexture <> '' then if not ResourceExists(EnvmapTexture) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
                         NewEnvmapTexture := 'textures\Shared\Cubemaps\' + ExtractFileName(EnvmapTexture);
-                        if ResourceExists(NewEnvmapTexture) then bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/' + ExtractFileName(f)
+                        if ResourceExists(NewEnvmapTexture) then bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/' + ExtractFileName(EnvmapTexture)
                         else if ResourceExists(EnvmapTexture + '.dds') then begin
                             bgsm.EditValues['Textures\Envmap'] := bgsm.EditValues['Textures\Envmap'] + '.dds';
                             NewEnvmapTexture := EnvmapTexture + '.dds';
@@ -222,6 +224,9 @@ begin
                     if bgsm.EditValues['EnvironmentMappingEye'] = 'yes' then bEverUsesEnvironmentMapping := true;
                     if (EnvmapTexture <> '') and (not bEverUsesEnvironmentMapping) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
+                        bgsm.EditValues['EnvironmentMapping'] := 'yes';
+                        if EnvironmentMappingMaskScale = '0.000000' then bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
+                        bChanged := true;
                     end;
                     if (EnvmapTexture = '') and bEverUsesEnvironmentMapping then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
@@ -690,7 +695,7 @@ begin
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingTexture'] := bgem.EditValues['Textures\Lighting'];
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SpecularTexture'] := bgem.EditValues['Textures\Specular'];
                 finally
-                    if bChanged and bSaveMaterials and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) then begin
+                    if bChanged and bSaveMaterials and (not bBadDiffuse) and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgem.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
