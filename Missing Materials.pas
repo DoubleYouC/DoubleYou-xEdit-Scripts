@@ -6,7 +6,7 @@ unit CheckSTATs;
 var
     slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slTreeAnimations,
     slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded,
-    slMaterialFixes, slUsedMaterials, slAllMaterials, slUnusedMaterials, slAffectedSCOL: TStringList;
+    slMaterialFixes, slUsedMaterials, slAllMaterials, slUnusedMaterials, slAffectedSCOL, slRootMaterials: TStringList;
 
     sOutputDir, sFixedMaterialsOutput: string;
     joTextureMswpMap, joCustomMaterials, joModelRecord: TJsonObject;
@@ -16,7 +16,7 @@ const
     bSaveMaterials = true;
     bSaveNewMaterials = true;
     bProcessStats = true;
-    bProcessNonStats = false;
+    bProcessNonStats = true;
 
 function Initialize: integer;
 {
@@ -55,6 +55,8 @@ begin
     slUnusedMaterials.Sorted := True;
     slAffectedSCOL := TStringList.Create;
     slAffectedSCOL.Sorted := True;
+    slRootMaterials := TStringList.Create;
+    slRootMaterials.Sorted := True;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
@@ -62,6 +64,8 @@ begin
     try
         sOutputDir :=  wbScriptsPath + 'FixModels\output';
         sFixedMaterialsOutput := sOutputDir + '\FixedMaterials';
+        if FileExists(sOutputDir + '\Unused Materials.txt') then
+            slUnusedMaterials.LoadFromFile(wbScriptsPath + 'FixModels\Unused Materials.txt');
 
         if not FileExists(sOutputDir + '\joTextureMswpMap.json') then begin
             ResourceContainerList(slContainers);
@@ -104,6 +108,7 @@ begin
         slUnusedMaterials.SaveToFile(sOutputDir + '\Unused Materials.txt');
         slUsedMaterials.SaveToFile(sOutputDir + '\Used Materials.txt');
         slAllMaterials.SaveToFile(sOutputDir + '\All Materials.txt');
+        slRootMaterials.SaveToFile(sOutputDir + '\Root Materials.txt');
     finally
         slMissingMaterials.Free;
         slNifErrors.Free;
@@ -124,6 +129,7 @@ begin
         slAllMaterials.Free;
         slUnusedMaterials.Free;
         slAffectedSCOL.Free;
+        slRootMaterials.Free;
     end;
 end;
 
@@ -163,16 +169,18 @@ begin
                     diffuse := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Diffuse'], resTexture));
                     if diffuse <> '' then if not ResourceExists(diffuse) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a diffuse texture that does not exist:' + #9 + diffuse);
+                        // If the diffuse doesn't exist, good likelihood the material is never used.
                         slMaterialFixes.Add(f + #9 + 'Textures\Diffuse was changed to blank due to missing texture' + #9 + diffuse);
                         bgsm.EditValues['Textures\Diffuse'] := '';
                         diffuse := '';
                         bChanged := true;
                     end;
+                    NormalTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
 
                     EnvmapTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
                     if EnvmapTexture <> '' then if not ResourceExists(EnvmapTexture) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
-                        NewEnvmapTexture := 'textures\Shared\Cubemaps\' + ExtractFileName(f);
+                        NewEnvmapTexture := 'textures\Shared\Cubemaps\' + ExtractFileName(EnvmapTexture);
                         if ResourceExists(NewEnvmapTexture) then bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/' + ExtractFileName(f)
                         else if ResourceExists(EnvmapTexture + '.dds') then begin
                             bgsm.EditValues['Textures\Envmap'] := bgsm.EditValues['Textures\Envmap'] + '.dds';
@@ -198,14 +206,14 @@ begin
                         bChanged := true;
                     end;
                     if EnvmapTexture = '' then EnvironmentMapping := 'no';
-                    if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
+                    // if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if (EnvironmentMapping = 'yes') and (EnvironmentMappingMaskScale = '0.000000') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping with a scale of 0.');
-                        slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
-                        bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
-                        bChanged := true;
+                        // slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
+                        // bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
+                        // bChanged := true;
                     end;
-                    if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
+                    // if EnvironmentMappingMaskScale = '0.000000' then EnvironmentMapping := 'no';
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMapping'] := EnvironmentMapping;
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['EnvironmentMappingWindow'] := bgsm.EditValues['EnvironmentMappingWindow'];
@@ -279,9 +287,9 @@ begin
                         if EmittanceMult = '0.000000' then EmitEnabled := 'no';
                         if EmitEnabled = 'no' then begin
                             slMaterialWarnings.Add(f + #9 + 'Warning! Material uses Emittance with a scale of 0 or a color of black.');
-                            slMaterialFixes.Add(f + #9 + 'Emittance was disabled due to not being used.');
-                            bgsm.EditValues['EmitEnabled'] := 'no';
-                            bChanged := true;
+                            // slMaterialFixes.Add(f + #9 + 'Emittance was disabled due to not being used.');
+                            // bgsm.EditValues['EmitEnabled'] := 'no';
+                            // bChanged := true;
                         end;
                     end;
                     if EmitEnabled = 'no' then begin
@@ -314,6 +322,7 @@ begin
                     if SmoothSpecTexture <> '' then if not ResourceExists(SmoothSpecTexture) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a specular texture that does not exist:' + #9 + SmoothSpecTexture);
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_s.dds';
+                        if not ResourceExists(testTexture) then testTexture := TrimLeftChars(NormalTexture, 6) + '_s.dds';
                         if ResourceExists(testTexture) then begin
                             slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed to ' + testTexture + ' due to missing texture' + #9 + SmoothSpecTexture);
                             SmoothSpecTexture := testTexture;
@@ -457,7 +466,7 @@ begin
                         joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RootMaterialPath'] := '';
                         bgsm.EditValues['RootMaterialPath'] := '';
                         bChanged := true;
-                    end;
+                    end else slRootMaterials.Add(RootMaterialPath);
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['DissolveFade'] := bgsm.EditValues['DissolveFade'];
 
                     //no nif equivalent it would seem
@@ -466,10 +475,11 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['HairTintColor'] := bgsm.EditValues['HairTintColor'];
 
                     //textures
-                    NormalTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Normal'], resTexture));
+                    
                     if NormalTexture <> '' then if not ResourceExists(NormalTexture) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a normal texture that does not exist:' + #9 + NormalTexture);
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_n.dds';
+                        if not ResourceExists(testTexture) then testTexture := TrimLeftChars(SmoothSpecTexture, 6) + '_n.dds';
                         if ResourceExists(testTexture) then begin
                             slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from ' + NormalTexture + ' due to the texture not existing.' + #9 + testTexture);
                             NormalTexture := testTexture;
@@ -680,7 +690,7 @@ begin
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingTexture'] := bgem.EditValues['Textures\Lighting'];
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SpecularTexture'] := bgem.EditValues['Textures\Specular'];
                 finally
-                    if bChanged and bSaveMaterials then begin
+                    if bChanged and bSaveMaterials and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgem.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
@@ -1189,7 +1199,7 @@ var
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, emit, emitColor, 
     BackLighting, uv, blocknamehere, clampMode, emitMult, BackLightPower, RefractionPower,
     GrayscaleToPaletteColor, RimPower, RimLighting, SpecularEnabled, SpecularMult, SpecularColor, Refraction,
-    FalloffEnabled, SoftEnabled, EnvironmentMapping, EnvironmentMappingMaskScale: string;
+    FalloffEnabled, SoftEnabled, EnvironmentMapping, EnvironmentMappingMaskScale, RootMaterialPath: string;
     bBlockMissingMat, bChanged, bHasShaderProperty, bHasAlpha, bHasTreeAnimations, bTree, bHasVertexColors: boolean;
 
     tsUV: TStrings;
@@ -1596,7 +1606,10 @@ begin
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMapping'] := EnvironmentMapping;
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['EnvironmentMappingMaskScale'] := EnvironmentMappingMaskScale;
                             
-                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RootMaterialPath'] := shaderProp.EditValues['Root Material'];
+                            RootMaterialPath := wbNormalizeResourceName(shaderProp.EditValues['Root Material'], resMaterial);
+                            joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['RootMaterialPath'] := RootMaterialPath;
+                            if RootMaterialPath <> '' then if ResourceExists(RootMaterialPath) then slRootMaterials.Add(RootMaterialPath);
+
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Alpha'] := FloatToStr(StrToFloatDef(shaderProp.EditValues['Alpha'],1));
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['Smoothness'] := shaderProp.EditValues['Smoothness'];
                             joCustomMaterial.O[matSuffix].O[diffuse].O[count].S['SubsurfaceLightingRolloff'] := shaderProp.EditValues['Subsurface Rolloff'];
