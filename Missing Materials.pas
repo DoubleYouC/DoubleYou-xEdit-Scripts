@@ -225,7 +225,11 @@ begin
                     if (EnvmapTexture <> '') and (not bEverUsesEnvironmentMapping) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
                         bgsm.EditValues['EnvironmentMapping'] := 'yes';
-                        if EnvironmentMappingMaskScale = '0.000000' then bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
+                        slMaterialFixes.Add(f + #9 + 'EnvironmentMapping was enabled due to specifying a cubemap.');
+                        if EnvironmentMappingMaskScale = '0.000000' then begin
+                            bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
+                            slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
+                        end;
                         bChanged := true;
                     end;
                     if (EnvmapTexture = '') and bEverUsesEnvironmentMapping then begin
