@@ -577,6 +577,41 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TessellationPnScale'] := bgsm.EditValues['TessellationPnScale'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTransmissiveScale'] := bgsm.EditValues['TranslucencyTransmissiveScale'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTurbulence'] := bgsm.EditValues['TranslucencyTurbulence'];
+
+                    // else if (key = 'NormalTexture') then score := -100;
+                    // else if (key = 'AlphaTest') then score := -100
+                    // else if (key = 'Alpha') then score := -100
+                    // else if (key = 'TwoSided') and (y = 'yes') then score := -100
+                    // else if (key = 'Decal') and (y = 'yes') then score := -100
+                    // else if (key = 'Tree') and (y = 'yes') then score := -100
+                    // else if (key = 'UOffset') then score := -100
+                    // else if (key = 'VOffset') then score := -100
+                    
+                    // else if (key = 'UScale') then score := -100
+                    // else if (key = 'VScale') then score := -100
+                    
+                    // else if (key = 'GrayscaleToPaletteColor') then score := -100
+                    // else if (key = 'Glowmap') then score := -100
+                    // else if (key = 'BaseColor') then score := -100
+                    
+                    joMaterialGroup.O['bgsm']
+                        .O[diffuse]
+                        .O[NormalTexture]
+                        .O[GrayscaleTexture]
+                        .O['Alpha Testing ' + bgsm.EditValues['AlphaTest']]
+                        .O['Alpha Blending ' + bgsm.EditValues['AlphaBlendMode']]
+                        .O['Alpha ' + joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['Alpha']]
+                        .O['Two Sided ' + bgsm.EditValues['TwoSided']]
+                        .O['Decal ' + bgsm.EditValues['Decal']]
+                        .O['Tree ' + bgsm.EditValues['Tree']]
+                        .O['GrayscaleToPaletteColor ' + GrayscaleToPaletteColor]
+                        .O['GrayscaleToPaletteScale ' + GrayscaleToPaletteScale]
+                        .O['Glowmap ' + bgsm.EditValues['Glowmap']]
+                        .O['UOffset ' + bgsm.EditValues['UOffset']]
+                        .O['VOffset ' + bgsm.EditValues['VOffset']]
+                        .O['UScale ' + bgsm.EditValues['UScale']]
+                        .A['VScale ' + bgsm.EditValues['VScale']]
+                        .Add(f);
                 finally
                     if bChanged and bSaveMaterials and (not bBadDiffuse) and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
@@ -1151,7 +1186,7 @@ begin
             else if (key = 'UScale') then score := -100
             else if (key = 'VScale') then score := -100
             else if (key = 'AlphaTest') then score := -100
-            else if (key = 'AlphaBlend') then score := -100
+            //else if (key = 'AlphaBlendMode') then score := -100
             else if (key = 'GrayscaleToPaletteColor') then score := -100
             else if (key = 'Glowmap') then score := -100
             else if (key = 'BaseColor') then score := -100
