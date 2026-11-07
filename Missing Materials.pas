@@ -9,7 +9,7 @@ var
     slMaterialFixes, slUsedMaterials, slAllMaterials, slUnusedMaterials, slAffectedSCOL, slRootMaterials: TStringList;
 
     sOutputDir, sFixedMaterialsOutput: string;
-    joTextureMswpMap, joCustomMaterials, joModelRecord: TJsonObject;
+    joTextureMswpMap, joCustomMaterials, joModelRecord, joMaterialGroup: TJsonObject;
 
 const
     bSaveModels = true;
@@ -17,6 +17,7 @@ const
     bSaveNewMaterials = true;
     bProcessStats = true;
     bProcessNonStats = true;
+
 
 function Initialize: integer;
 {
@@ -61,8 +62,10 @@ begin
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
     joModelRecord := TJsonObject.Create;
+    joMaterialGroup := TJsonObject.Create;
     try
         sOutputDir :=  wbScriptsPath + 'FixModels\output';
+        EnsureDirectoryExists(sOutputDir);
         sFixedMaterialsOutput := sOutputDir + '\FixedMaterials';
         if FileExists(wbScriptsPath + 'FixModels\Unused Materials.txt') then
             slUnusedMaterials.LoadFromFile(wbScriptsPath + 'FixModels\Unused Materials.txt');
@@ -77,10 +80,11 @@ begin
         slMaterialWarnings.SaveToFile(sOutputDir + '\Material Warnings.txt');
         ListStringsInStringList(slMaterialFixes);
         slMaterialFixes.SaveToFile(sOutputDir + '\Material Fixes.txt');
+        joMaterialGroup.SaveToFile(sOutputDir + '\joMaterialGroup.json', False, TEncoding.UTF8, True);
 
         CollectRecords;
-        // sOutputDir was created in FilesInContainers
         joModelRecord.SaveToFile(sOutputDir + '\joModelRecord.json', False, TEncoding.UTF8, True);
+        
 
         CheckModels;
 
@@ -100,9 +104,8 @@ begin
         slTreeAnimations.SaveToFile(sOutputDir + '\Tree Animations.txt');
         slAffectedSCOL.SaveToFile(sOutputDir + '\Affected SCOLs.txt');
 
-        // sOutputDir was created in FilesInContainers
         joCustomMaterials.SaveToFile(sOutputDir + '\joCustomMaterials.json', False, TEncoding.UTF8, True);
-
+        
         slUnusedMaterials.Assign(slAllMaterials);
         slUnusedmaterials.Difference(slUsedMaterials);
         slUnusedMaterials.SaveToFile(sOutputDir + '\Unused Materials.txt');
@@ -130,6 +133,7 @@ begin
         slUnusedMaterials.Free;
         slAffectedSCOL.Free;
         slRootMaterials.Free;
+        joMaterialGroup.Free;
     end;
 end;
 
@@ -709,7 +713,6 @@ begin
             slAllMaterials.Add(LowerCase(f));
         end;
     finally
-        EnsureDirectoryExists(sOutputDir);
         joTextureMswpMap.SaveToFile(sOutputDir + '\joTextureMswpMap.json', False, TEncoding.UTF8, True);
         slArchivedFiles.Free;
     end;
