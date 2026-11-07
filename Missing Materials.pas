@@ -574,7 +574,7 @@ begin
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTransmissiveScale'] := bgsm.EditValues['TranslucencyTransmissiveScale'];
                     // joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['TranslucencyTurbulence'] := bgsm.EditValues['TranslucencyTurbulence'];
                 finally
-                    if bChanged and bSaveMaterials then begin
+                    if bChanged and bSaveMaterials and (not bBadDiffuse) and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgsm.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
