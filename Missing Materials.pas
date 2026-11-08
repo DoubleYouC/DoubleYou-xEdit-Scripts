@@ -167,7 +167,7 @@ var
     GlowTexture, WetnessControl_EnvMapScale, DisplacementTexture, InnerLayerTexture, EnvmapMaskTexture, NewEnvmapTexture, RootMaterialPath: string;
     bgsm: TwbBGSMFile;
     bgem: TwbBGEMFile;
-    bChanged, bEverUsesEnvironmentMapping, bBadDiffuse: boolean;
+    bChanged, bEverUsesEnvironmentMapping, bBadDiffuse, bIgnored: boolean;
 begin
     slArchivedFiles := TStringList.Create;
     slArchivedFiles.Sorted := True;
@@ -184,15 +184,16 @@ begin
             ext := ExtractFileExt(f);
             if SameText(ext, '.bgsm') then begin
                 bgsm := TwbBGSMFile.Create;
+                bIgnored := (slIgnoredMaterials.IndexOf(LowerCase(f)) <> -1) or (slUnusedmaterials.IndexOf(LowerCase(f)) <> -1);
                 AddMessage(f);
                 try
                     bgsm.LoadFromResource(f);
                     diffuse := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Diffuse'], resTexture));
                     if diffuse <> '' then if not ResourceExists(diffuse) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a diffuse texture that does not exist:' + #9 + diffuse);
-                        bBadDiffuse := true;
+                        bIgnored := true;
                         // If the diffuse doesn't exist, good likelihood the material is never used.
-                        // slMaterialFixes.Add(f + #9 + 'Textures\Diffuse was changed to blank due to missing texture' + #9 + diffuse);
+                        // if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Diffuse was changed to blank due to missing texture' + #9 + diffuse);
                         // bgsm.EditValues['Textures\Diffuse'] := '';
                         // diffuse := '';
                         // bChanged := true;
@@ -201,7 +202,7 @@ begin
 
                     EnvmapTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
                     if EnvmapTexture <> '' then if not ResourceExists(EnvmapTexture) then begin
-                        slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
+                        if not bIgnored then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
                         NewEnvmapTexture := 'textures\Shared\Cubemaps\' + ExtractFileName(EnvmapTexture);
                         if ResourceExists(NewEnvmapTexture) then bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/' + ExtractFileName(EnvmapTexture)
                         else if ResourceExists(EnvmapTexture + '.dds') then begin
@@ -212,7 +213,7 @@ begin
                             NewEnvmapTexture := 'textures\Shared\Cubemaps\mipblur_DefaultOutside1.dds';
                             bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/mipblur_DefaultOutside1.dds';
                         end;
-                        slMaterialFixes.Add(f + #9 + 'Textures\Envmap was changed to ' + NewEnvmapTexture + ' due to missing texture' + #9 + EnvmapTexture);
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Envmap was changed to ' + NewEnvmapTexture + ' due to missing texture' + #9 + EnvmapTexture);
                         
                         EnvmapTexture := NewEnvmapTexture;
                         bChanged := true;
@@ -222,7 +223,7 @@ begin
                     EnvironmentMappingMaskScale := bgsm.EditValues['EnvironmentMappingMaskScale'];
                     if (EnvmapTexture = '') and (EnvironmentMapping = 'yes') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
-                        slMaterialFixes.Add(f + #9 + 'Textures\Envmap was changed to Shared/Cubemaps/mipblur_DefaultOutside1.dds due to no cubemap being specified.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Envmap was changed to Shared/Cubemaps/mipblur_DefaultOutside1.dds due to no cubemap being specified.');
                         bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/mipblur_DefaultOutside1.dds';
                         EnvmapTexture := 'Shared/Cubemaps/mipblur_DefaultOutside1.dds';
                         bChanged := true;
@@ -231,7 +232,7 @@ begin
                     // if EnvironmentMapping = 'no' then EnvironmentMappingMaskScale := '0.000000';
                     if (EnvironmentMapping = 'yes') and (EnvironmentMappingMaskScale = '0.000000') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping with a scale of 0.');
-                        // slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
+                        // if not bIgnored then slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
                         // bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
                         // bChanged := true;
                     end;
@@ -245,16 +246,16 @@ begin
                     if (EnvmapTexture <> '') and (not bEverUsesEnvironmentMapping) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material has a cubemap but does not use environment mapping!');
                         bgsm.EditValues['EnvironmentMapping'] := 'yes';
-                        slMaterialFixes.Add(f + #9 + 'EnvironmentMapping was enabled due to specifying a cubemap.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'EnvironmentMapping was enabled due to specifying a cubemap.');
                         if EnvironmentMappingMaskScale = '0.000000' then begin
                             bgsm.EditValues['EnvironmentMappingMaskScale'] := '1.000000';
-                            slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'EnvironmentMappingMaskScale was changed to 1 due to using environment mapping but scale was 0.');
                         end;
                         bChanged := true;
                     end;
                     if (EnvmapTexture = '') and bEverUsesEnvironmentMapping then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses environment mapping but does not have a cubemap!');
-                        slMaterialFixes.Add(f + #9 + 'Textures\Envmap was changed to Shared/Cubemaps/mipblur_DefaultOutside1.dds due to no cubemap being specified.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Envmap was changed to Shared/Cubemaps/mipblur_DefaultOutside1.dds due to no cubemap being specified.');
                         bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/mipblur_DefaultOutside1.dds';
                         EnvmapTexture := 'Shared/Cubemaps/mipblur_DefaultOutside1.dds';
                         bChanged := true;
@@ -264,7 +265,7 @@ begin
                     GrayscaleTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Grayscale'], resTexture));
                     if GrayscaleTexture <> '' then if not ResourceExists(GrayscaleTexture) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a grayscale texture that does not exist:' + #9 + GrayscaleTexture);
-                        slMaterialFixes.Add(f + #9 + 'Textures\Grayscale was changed to blank due to missing texture' + #9 + GrayscaleTexture);
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Grayscale was changed to blank due to missing texture' + #9 + GrayscaleTexture);
                         bgsm.EditValues['Textures\Grayscale'] := '';
                         GrayscaleTexture := '';
                         bChanged := true;
@@ -272,7 +273,7 @@ begin
                     GrayscaleToPaletteScale := bgsm.EditValues['GrayscaleToPaletteScale'];
                     if (GrayscaleTexture = '') and (GrayscaleToPaletteColor = 'yes') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses grayscale to palette but does not have a palette!');
-                        slMaterialFixes.Add(f + #9 + 'GrayscaleToPaletteColor was disabled due to not using a palette texture.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'GrayscaleToPaletteColor was disabled due to not using a palette texture.');
                         bgsm.EditValues['GrayscaleToPaletteColor'] := 'no';
                         bChanged := true;
                     end;
@@ -287,7 +288,7 @@ begin
                     if Refraction = 'no' then RefractionPower := '0.000000';
                     if (Refraction = 'yes') and (RefractionPower = '0.000000') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses refraction with a scale of 0.');
-                        slMaterialFixes.Add(f + #9 + 'Refraction was disabled due to it having a scale of 0.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'Refraction was disabled due to it having a scale of 0.');
                         bgsm.EditValues['Refraction'] := 'no';
                         bChanged := true;
                     end;
@@ -300,7 +301,7 @@ begin
                     if BackLighting = 'no' then BackLightPower := '0.000000';
                     if (BackLighting = 'yes') and (BackLightPower = '0.000000') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses backlighting with a scale of 0.');
-                        slMaterialFixes.Add(f + #9 + 'BackLighting was disabled due to it having a scale of 0.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'BackLighting was disabled due to it having a scale of 0.');
                         bgsm.EditValues['BackLighting'] := 'no';
                         bChanged := true;
                     end;
@@ -316,7 +317,7 @@ begin
                         if EmittanceMult = '0.000000' then EmitEnabled := 'no';
                         if EmitEnabled = 'no' then begin
                             slMaterialWarnings.Add(f + #9 + 'Warning! Material uses Emittance with a scale of 0 or a color of black.');
-                            // slMaterialFixes.Add(f + #9 + 'Emittance was disabled due to not being used.');
+                            // if not bIgnored then slMaterialFixes.Add(f + #9 + 'Emittance was disabled due to not being used.');
                             // bgsm.EditValues['EmitEnabled'] := 'no';
                             // bChanged := true;
                         end;
@@ -334,7 +335,7 @@ begin
                     if RimLighting = 'no' then RimPower := '0.000000';
                     if (RimLighting = 'yes') and (RimPower = '0.000000') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses Character Rim Lighting with a scale of 0.');
-                        slMaterialFixes.Add(f + #9 + 'Character Rim Lighting was disabled due to not being used.');
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'Character Rim Lighting was disabled due to not being used.');
                         bgsm.EditValues['RimLighting'] := 'no';
                         bChanged := true;
                     end;
@@ -354,17 +355,17 @@ begin
                             if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_s.dds';
                             if not ResourceExists(testTexture) then testTexture := TrimLeftChars(NormalTexture, 6) + '_s.dds';
                             if ResourceExists(testTexture) then begin
-                                slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed to ' + testTexture + ' due to missing texture' + #9 + SmoothSpecTexture);
+                                if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed to ' + testTexture + ' due to missing texture' + #9 + SmoothSpecTexture);
                                 SmoothSpecTexture := testTexture;
                                 bgsm.EditValues['Textures\SmoothSpec'] := TrimRightChars(testTexture, 9);
                             end 
                             else if (SpecularEnabled = 'yes') then begin
-                                slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed from ' + SmoothSpecTexture + ' due to the texture not existing.' + #9 + 'textures\shared\blue_d.dds');
+                                if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed from ' + SmoothSpecTexture + ' due to the texture not existing.' + #9 + 'textures\shared\blue_d.dds');
                                 SmoothSpecTexture := 'textures\shared\blue_d.dds';
                                 bgsm.EditValues['Textures\SmoothSpec'] := 'Shared/Blue_d.dds';
                             end 
                             else begin
-                                slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed to blank due to missing texture' + #9 + SmoothSpecTexture);
+                                if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed to blank due to missing texture' + #9 + SmoothSpecTexture);
                                 SmoothSpecTexture := '';
                                 bgsm.EditValues['Textures\SmoothSpec'] := '';
                             end;
@@ -375,7 +376,7 @@ begin
                         if not SameText(SmoothSpecTexture, testTexture) then 
                             if ResourceExists(testTexture) then begin
                                 slMaterialWarnings.Add(f + #9 + 'Warning! Material uses' + #9 + SmoothSpecTexture + #9 + 'as its specular instead of the specular texture based on its diffuse name:' + #9 + testTexture);
-                                slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed from' + #9 + SmoothSpecTexture + #9 + ' to the specular texture based on its diffuse name.' + #9 + testTexture);
+                                if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed from' + #9 + SmoothSpecTexture + #9 + ' to the specular texture based on its diffuse name.' + #9 + testTexture);
                                 SmoothSpecTexture := testTexture;
                                 bgsm.EditValues['Textures\SmoothSpec'] := TrimRightChars(testTexture, 9);
                                 bChanged := true;
@@ -383,7 +384,7 @@ begin
                                 testTexture := TrimLeftChars(SmoothSpecTexture, 6) + '_s.dds';
                                 if not SameText(SmoothSpecTexture, testTexture) then if ResourceExists(testTexture) then begin
                                     slMaterialWarnings.Add(f + #9 + 'Warning! Material uses' + #9 + SmoothSpecTexture + #9 + 'as its specular instead of the specular texture based on its specular name:' + #9 + testTexture);
-                                    slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed from' + #9 + SmoothSpecTexture + #9 + 'to the specular texture based on its specular name.' + #9 + testTexture);
+                                    if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was changed from' + #9 + SmoothSpecTexture + #9 + 'to the specular texture based on its specular name.' + #9 + testTexture);
                                     SmoothSpecTexture := testTexture;
                                     bgsm.EditValues['Textures\SmoothSpec'] := TrimRightChars(testTexture, 9);
                                     bChanged := true;
@@ -395,12 +396,12 @@ begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material uses specular but does not have a specular texture!');
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_s.dds';
                         if ResourceExists(testTexture) then begin
-                            slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was added due to using specular but not using its existing specular map.' + #9 + testTexture);
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was added due to using specular but not using its existing specular map.' + #9 + testTexture);
                             SmoothSpecTexture := testTexture;
                             bgsm.EditValues['Textures\SmoothSpec'] := TrimRightChars(testTexture, 9);
                         end 
                         else begin
-                            slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was added due to using specular but not using a specular map.' + #9 + 'textures\shared\blue_d.dds');
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was added due to using specular but not using a specular map.' + #9 + 'textures\shared\blue_d.dds');
                             SmoothSpecTexture := 'textures\shared\blue_d.dds';
                             bgsm.EditValues['Textures\SmoothSpec'] := 'Shared/Blue_d.dds';
                         end;
@@ -410,10 +411,10 @@ begin
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_s.dds';
                         if ResourceExists(testTexture) then begin
                             slMaterialWarnings.Add(f + #9 + 'Warning! Material does not use its existing specular texture:' + #9 + testTexture);
-                            slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was added to use its existing specular map.' + #9 + testTexture);
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\SmoothSpec was added to use its existing specular map.' + #9 + testTexture);
                             SmoothSpecTexture := testTexture;
                             bgsm.EditValues['Textures\SmoothSpec'] := TrimRightChars(testTexture, 9);
-                            slMaterialFixes.Add(f + #9 + 'SpecularEnabled was enabled to make use of its existing specular map.');
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'SpecularEnabled was enabled to make use of its existing specular map.');
                             SpecularEnabled := 'yes';
                             bgsm.EditValues['SpecularEnabled'] := 'yes';
                             bChanged := true;
@@ -425,7 +426,7 @@ begin
                     if (SmoothSpecTexture <> '') and (SpecularEnabled = 'no') then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material has a specular texture but does not use specular!');
                         if SameText(RightStr(SmoothSpecTexture, 6), '_s.dds') then begin
-                            slMaterialFixes.Add(f + #9 + 'SpecularEnabled was enabled due to material specifying a specular texture but not enabling specular.');
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'SpecularEnabled was enabled due to material specifying a specular texture but not enabling specular.');
                             SpecularEnabled := 'yes';
                             bgsm.EditValues['SpecularEnabled'] := 'yes';
                             bChanged := true;
@@ -435,7 +436,7 @@ begin
                         // if SpecularColor = '#000000' then SpecularEnabled := 'no';
                         if SpecularMult = '0.000000' then begin                            
                             slMaterialWarnings.Add(f + #9 + 'Warning! Material uses specular with a scale of 0.');
-                            slMaterialFixes.Add(f + #9 + 'SpecularMult was set to 1 due to using specular with a scale of 0.');
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'SpecularMult was set to 1 due to using specular with a scale of 0.');
                             SpecularMult := '1.000000';
                             bgsm.EditValues['SpecularMult'] := SpecularMult;
                             bChanged := true;
@@ -516,7 +517,7 @@ begin
                     joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RootMaterialPath'] := bgsm.EditValues['RootMaterialPath'];
                     if RootMaterialPath <> '' then if not ResourceExists(RootMaterialPath) then begin
                         slMaterialWarnings.Add(f + #9 + 'Warning! Material specifies a root material path that does not exist!' + #9 + RootMaterialPath);
-                        slMaterialFixes.Add(f + #9 + 'RootMaterialPath was set to blank due to specifying a non-existent material.' + #9 + RootMaterialPath);
+                        if not bIgnored then slMaterialFixes.Add(f + #9 + 'RootMaterialPath was set to blank due to specifying a non-existent material.' + #9 + RootMaterialPath);
                         joTextureMswpMap.O['bgsm'].O[diffuse].O[f].S['RootMaterialPath'] := '';
                         bgsm.EditValues['RootMaterialPath'] := '';
                         bChanged := true;
@@ -535,12 +536,12 @@ begin
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_n.dds';
                         if not ResourceExists(testTexture) then testTexture := TrimLeftChars(SmoothSpecTexture, 6) + '_n.dds';
                         if ResourceExists(testTexture) then begin
-                            slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from ' + NormalTexture + ' due to the texture not existing.' + #9 + testTexture);
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from ' + NormalTexture + ' due to the texture not existing.' + #9 + testTexture);
                             NormalTexture := testTexture;
                             bgsm.EditValues['Textures\Normal'] := TrimRightChars(testTexture, 9);
                         end 
                         else begin
-                            slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed to textures\shared\FlatFlat_n.dds due to missing texture' + #9 + NormalTexture);
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed to textures\shared\FlatFlat_n.dds due to missing texture' + #9 + NormalTexture);
                             SmoothSpecTexture := 'textures\shared\FlatFlat_n.dds';
                             bgsm.EditValues['Textures\Normal'] := 'Shared/FlatFlat_n.dds';
                         end;
@@ -550,7 +551,7 @@ begin
                         if SameText(RightStr(diffuse, 6), '_d.dds') then testTexture := TrimLeftChars(diffuse, 6) + '_n.dds';
                         if ResourceExists(testTexture) then begin
                             slMaterialWarnings.Add(f + #9 + 'Warning! Material does not use its existing normal texture:' + #9 + testTexture);
-                            slMaterialFixes.Add(f + #9 + 'Textures\Normal was added to use its existing normal texture.' + #9 + testTexture);
+                            if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Normal was added to use its existing normal texture.' + #9 + testTexture);
                             NormalTexture := testTexture;
                             bgsm.EditValues['Textures\Normal'] := TrimRightChars(testTexture, 9);
                             bChanged := true;
@@ -561,7 +562,7 @@ begin
                         if not SameText(NormalTexture, testTexture) then 
                             if ResourceExists(testTexture) then begin
                                 slMaterialWarnings.Add(f + #9 + 'Warning! Material uses' + #9 + NormalTexture + #9 + 'as its normal instead of the normal texture based on its diffuse name:' + #9 + testTexture);
-                                slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from' + #9 + NormalTexture + #9 + ' to the normal texture based on its diffuse name.' + #9 + testTexture);
+                                if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from' + #9 + NormalTexture + #9 + ' to the normal texture based on its diffuse name.' + #9 + testTexture);
                                 NormalTexture := testTexture;
                                 bgsm.EditValues['Textures\Normal'] := TrimRightChars(testTexture, 9);
                                 bChanged := true;
@@ -569,7 +570,7 @@ begin
                                 testTexture := TrimLeftChars(SmoothSpecTexture, 6) + '_n.dds';
                                 if not SameText(NormalTexture, testTexture) then if ResourceExists(testTexture) then begin
                                     slMaterialWarnings.Add(f + #9 + 'Warning! Material uses' + #9 + NormalTexture + #9 + 'as its normal instead of the normal texture based on its specular name:' + #9 + testTexture);
-                                    slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from' + #9 + NormalTexture + #9 + 'to the normal texture based on its specular name.' + #9 + testTexture);
+                                    if not bIgnored then slMaterialFixes.Add(f + #9 + 'Textures\Normal was changed from' + #9 + NormalTexture + #9 + 'to the normal texture based on its specular name.' + #9 + testTexture);
                                     NormalTexture := testTexture;
                                     bgsm.EditValues['Textures\Normal'] := TrimRightChars(testTexture, 9);
                                     bChanged := true;
@@ -655,7 +656,7 @@ begin
                     // else if (key = 'Glowmap') then score := -100
                     // else if (key = 'BaseColor') then score := -100
                     
-                    if slUnusedMaterials.IndexOf(LowerCase(f)) = -1 then begin
+                    if not bIgnored then begin
                         joMaterialGroup.O['bgsm']
                             .O[diffuse]
                             .O[NormalTexture]
@@ -693,7 +694,7 @@ begin
                             .A['VScale ' + bgsm.EditValues['VScale']].Count > 1 then slMultipleMaterials.Add(diffuse);
                     end;
                 finally
-                    if bChanged and bSaveMaterials and (not bBadDiffuse) and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) and (slIgnoredMaterials.IndexOf(LowerCase(f)) = -1) then begin
+                    if bChanged and bSaveMaterials and (not bIgnored) then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgsm.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
@@ -701,6 +702,7 @@ begin
                 end;
             end else if SameText(ext, '.bgem') then begin
                 bgem := TwbBGEMFile.Create;
+                bIgnored := (slIgnoredMaterials.IndexOf(LowerCase(f)) <> -1) or (slUnusedmaterials.IndexOf(LowerCase(f)) <> -1);
                 AddMessage(f);
                 try
                     bgem.LoadFromResource(f);
@@ -818,7 +820,7 @@ begin
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['LightingTexture'] := bgem.EditValues['Textures\Lighting'];
                     // joTextureMswpMap.O['bgem'].O[diffuse].O[f].S['SpecularTexture'] := bgem.EditValues['Textures\Specular'];
                 finally
-                    if bChanged and bSaveMaterials and (not bBadDiffuse) and (slUnusedMaterials.IndexOf(LowerCase(f)) = -1) and (slIgnoredMaterials.IndexOf(LowerCase(f)) = -1) then begin
+                    if bChanged and bSaveMaterials and (not bIgnored) then begin
                         EnsureDirectoryExists(sFixedMaterialsOutput + '\' + ExtractFilePath(f));
                         bgem.SaveToFile(sFixedMaterialsOutput + '\' + f);
                     end;
