@@ -202,7 +202,7 @@ begin
 
                     EnvmapTexture := LowerCase(wbNormalizeResourceName(bgsm.EditValues['Textures\Envmap'], resTexture));
                     if EnvmapTexture <> '' then if not ResourceExists(EnvmapTexture) then begin
-                        if not bIgnored then slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
+                        slMaterialWarnings.Add(f + #9 + 'Warning! Material uses a cubemap texture that does not exist:' + #9 + EnvmapTexture);
                         NewEnvmapTexture := 'textures\Shared\Cubemaps\' + ExtractFileName(EnvmapTexture);
                         if ResourceExists(NewEnvmapTexture) then bgsm.EditValues['Textures\Envmap'] := 'Shared/Cubemaps/' + ExtractFileName(EnvmapTexture)
                         else if ResourceExists(EnvmapTexture + '.dds') then begin
