@@ -7,7 +7,7 @@ var
     slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slTreeAnimations,
     slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded,
     slMaterialFixes, slUsedMaterials, slAllMaterials, slUnusedMaterials, slAffectedSCOL, slRootMaterials,
-    slMultipleMaterials, slIgnoredMaterials: TStringList;
+    slMultipleMaterials, slIgnoredMaterials, slUseThese, slInsteadOfThese, slSwitch: TStringList;
 
     sOutputDir, sFixedMaterialsOutput: string;
     joTextureMswpMap, joCustomMaterials, joModelRecord, joMaterialGroup: TJsonObject;
@@ -65,6 +65,10 @@ begin
     slMultipleMaterials.Sorted := True;
     slIgnoredMaterials := TStringList.Create;
     slIgnoredMaterials.Sorted := True;
+    slUseThese := TStringList.Create;
+    slInsteadOfThese := TStringList.Create;
+    slSwitch := TStringList.Create;
+    slSwitch.Sorted := True;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
@@ -78,6 +82,11 @@ begin
             slUnusedMaterials.LoadFromFile(wbScriptsPath + 'FixModels\Unused Materials.txt');
         if FileExists(wbScriptsPath + 'FixModels\Ignore Materials.txt') then
             slIgnoredMaterials.LoadFromFile(wbScriptsPath + 'FixModels\Ignore Materials.txt');
+
+        if FileExists(wbScriptsPath + 'FixModels\Use These.txt') then
+            slUseThese.LoadFromFile(wbScriptsPath + 'FixModels\Use These.txt');
+        if FileExists(wbScriptsPath + 'FixModels\Instead Of These.txt') then
+            slInsteadOfThese.LoadFromFile(wbScriptsPath + 'FixModels\Instead Of These.txt');
 
         if not FileExists(sOutputDir + '\joTextureMswpMap.json') then begin
             ResourceContainerList(slContainers);
@@ -126,6 +135,7 @@ begin
         slUsedMaterials.SaveToFile(sOutputDir + '\Used Materials.txt');
         slAllMaterials.SaveToFile(sOutputDir + '\All Materials.txt');
         slRootMaterials.SaveToFile(sOutputDir + '\Root Materials.txt');
+        slSwitch.SaveToFile(sOutputDir + '\Switched Materials.txt');
     finally
         slIgnoredMaterials.Free;
         slMissingMaterials.Free;
@@ -150,6 +160,9 @@ begin
         slAffectedSCOL.Free;
         slRootMaterials.Free;
         joMaterialGroup.Free;
+        slUseThese.Free;
+        slInsteadOfThese.Free;
+        slSwitch.Free;
     end;
 end;
 
@@ -1324,7 +1337,7 @@ end;
 
 function NifNeedsMaterial(model: string): boolean;
 var
-    i, count, NiAlphaPropFlags, s: integer;
+    i, count, NiAlphaPropFlags, s, instead: integer;
     mat, matExt, blockName, diffuse, matPath, matSuffix, mess, emit, emitColor, 
     BackLighting, uv, blocknamehere, clampMode, emitMult, BackLightPower, RefractionPower,
     GrayscaleToPaletteColor, RimPower, RimLighting, SpecularEnabled, SpecularMult, SpecularColor, Refraction,
@@ -1846,11 +1859,24 @@ begin
                             IsCustomMaterialUnique(joCustomMaterial.O[matSuffix].O[diffuse].O[count], matSuffix, diffuse, model, blocknamehere, matPath);
                             bHasTreeAnimations := DoesMatHaveTreeAnimations(matPath);
                         end;
-                        shaderProp.EditValues['Name'] := matPath;
+                        instead := slInsteadOfThese.IndexOf(Lowercase(matPath));
+                        if instead <> -1 then begin
+                            matPath := slUseThese[instead];
+                            shaderProp.EditValues['Name'] := matPath;
+                            bChanged := True;
+                            slSwitch.Add(model + #9 + blocknamehere + '\Name: Switched material to "' + matPath + '"');
+                        end else shaderProp.EditValues['Name'] := matPath;
                         mat := matPath;
                         bChanged := true;
                     end else begin
                         //material exists
+                        instead := slInsteadOfThese.IndexOf(Lowercase(mat));
+                        if instead <> -1 then begin
+                            mat := slUseThese[instead];
+                            shaderProp.EditValues['Name'] := mat;
+                            bChanged := True;
+                            slSwitch.Add(model + #9 + blocknamehere + '\Name: Switched material to "' + mat + '"');
+                        end;
                         slUsedMaterials.Add(LowerCase(mat));
                         bHasTreeAnimations := DoesMatHaveTreeAnimations(mat);
                     end;
