@@ -1125,11 +1125,11 @@ begin
         if not ResourceExists(replacementMat) then continue;
         if slInsteadOfThese.IndexOf(originalMat) <> -1 then begin
             AddMessage(ShortName(r) + ' specifies original material ' + #9 + originalMat);
-            MatSwapsToChange.Add(ShortName(r) + ' specifies original material ' + #9 + originalMat);
+            slMatSwapsToChange.Add(ShortName(r) + ' specifies original material ' + #9 + originalMat);
         end;
         if slInsteadOfThese.IndexOf(replacementMat) <> -1 then begin
             AddMessage(ShortName(r) + ' specifies replacement material ' + #9 + replacementMat);
-            MatSwapsToChange.Add(ShortName(r) + ' specifies replacement material ' + #9 + replacementMat);
+            slMatSwapsToChange.Add(ShortName(r) + ' specifies replacement material ' + #9 + replacementMat);
         end;
 
         slUsedMaterials.Add(replacementMat);
