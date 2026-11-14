@@ -7,7 +7,7 @@ var
     slMissingMaterials, slNifErrors, slNeedsMaterials, slNeedsDecalFlag, slAddedMat, slTreeAnimations,
     slMaterialWarnings, slContainers, slMaterialsToVerify, slModelsToCheck, slMaterialsAdded,
     slMaterialFixes, slUsedMaterials, slAllMaterials, slUnusedMaterials, slAffectedSCOL, slRootMaterials,
-    slMultipleMaterials, slIgnoredMaterials, slUseThese, slInsteadOfThese, slSwitch: TStringList;
+    slMultipleMaterials, slIgnoredMaterials, slUseThese, slInsteadOfThese, slSwitch, slMatSwapsToChange: TStringList;
 
     sOutputDir, sFixedMaterialsOutput: string;
     joTextureMswpMap, joCustomMaterials, joModelRecord, joMaterialGroup: TJsonObject;
@@ -17,7 +17,7 @@ const
     bSaveMaterials = true;
     bSaveNewMaterials = true;
     bProcessStats = true;
-    bProcessNonStats = true;
+    bProcessNonStats = false;
 
 
 function Initialize: integer;
@@ -69,6 +69,8 @@ begin
     slInsteadOfThese := TStringList.Create;
     slSwitch := TStringList.Create;
     slSwitch.Sorted := True;
+    slMatSwapsToChange := TStringList.Create;
+    slMatSwapsToChange.Sorted := True;
 
     joTextureMswpMap := TJsonObject.Create;
     joCustomMaterials := TJsonObject.Create;
@@ -136,6 +138,7 @@ begin
         slAllMaterials.SaveToFile(sOutputDir + '\All Materials.txt');
         slRootMaterials.SaveToFile(sOutputDir + '\Root Materials.txt');
         slSwitch.SaveToFile(sOutputDir + '\Switched Materials.txt');
+        slMatSwapsToChange.SaveToFile(sOutputDir + '\MatSwapsToChange.txt');
     finally
         slIgnoredMaterials.Free;
         slMissingMaterials.Free;
@@ -163,6 +166,7 @@ begin
         slUseThese.Free;
         slInsteadOfThese.Free;
         slSwitch.Free;
+        slMatSwapsToChange.Free;
     end;
 end;
 
@@ -981,6 +985,13 @@ begin
         f := FileByIndex(i);
 
         if bProcessStats then CheckGroup(f, 'STAT', true);
+        g := GroupBySignature(f, 'MSWP');
+        for j := 0 to Pred(ElementCount(g)) do begin
+            r := ElementByIndex(g, j);
+            if not IsWinningOverride(r) then continue;
+            if not ReferencedByCount(r) > 0 then continue;
+            ProcessMaterialSwap(r);
+        end;
         if not bProcessNonStats then continue;
         CheckGroupDestructible(f, 'ACTI', false);
         CheckGroup(f, 'ADDN', false);
@@ -1091,13 +1102,7 @@ begin
             end;
         end;
 
-        g := GroupBySignature(f, 'MSWP');
-        for j := 0 to Pred(ElementCount(g)) do begin
-            r := ElementByIndex(g, j);
-            if not IsWinningOverride(r) then continue;
-            if not ReferencedByCount(r) > 0 then continue;
-            ProcessMaterialSwap(r);
-        end;
+        
     end;
 end;
 
@@ -1118,6 +1123,15 @@ begin
         if replacementMat = '' then continue;
         if not ResourceExists(originalMat) then continue;
         if not ResourceExists(replacementMat) then continue;
+        if slInsteadOfThese.IndexOf(originalMat) <> -1 then begin
+            AddMessage(ShortName(r) + ' specifies original material ' + #9 + originalMat);
+            MatSwapsToChange.Add(ShortName(r) + ' specifies original material ' + #9 + originalMat);
+        end;
+        if slInsteadOfThese.IndexOf(replacementMat) <> -1 then begin
+            AddMessage(ShortName(r) + ' specifies replacement material ' + #9 + replacementMat);
+            MatSwapsToChange.Add(ShortName(r) + ' specifies replacement material ' + #9 + replacementMat);
+        end;
+
         slUsedMaterials.Add(replacementMat);
     end;
 end;
@@ -1861,10 +1875,11 @@ begin
                         end;
                         instead := slInsteadOfThese.IndexOf(Lowercase(matPath));
                         if instead <> -1 then begin
+                            mess := model + #9 + blocknamehere + '\Name: Switched material from ' + matPath;
                             matPath := slUseThese[instead];
                             shaderProp.EditValues['Name'] := matPath;
                             bChanged := True;
-                            slSwitch.Add(model + #9 + blocknamehere + '\Name: Switched material to "' + matPath + '"');
+                            slSwitch.Add(mess + ' to "' + matPath + '"');
                         end else shaderProp.EditValues['Name'] := matPath;
                         mat := matPath;
                         bChanged := true;
@@ -1872,10 +1887,11 @@ begin
                         //material exists
                         instead := slInsteadOfThese.IndexOf(Lowercase(mat));
                         if instead <> -1 then begin
+                            mess := model + #9 + blocknamehere + '\Name: Switched material from ' + mat;
                             mat := slUseThese[instead];
                             shaderProp.EditValues['Name'] := mat;
                             bChanged := True;
-                            slSwitch.Add(model + #9 + blocknamehere + '\Name: Switched material to "' + mat + '"');
+                            slSwitch.Add(mess + ' to "' + mat + '"');
                         end;
                         slUsedMaterials.Add(LowerCase(mat));
                         bHasTreeAnimations := DoesMatHaveTreeAnimations(mat);
